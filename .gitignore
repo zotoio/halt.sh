@@ -76,3 +76,4 @@ dist/
 scripts/*.json
 
 .env
+cache/

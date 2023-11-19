@@ -7,4 +7,15 @@ services:
     ports:
       - "80:80"
       - "443:443"
-    
+    volumes:
+      - ./backends/botz.ai/cache:/usr/share/nginx/html/botz.ai/cache
+  botz:
+    build: ./backends/botz.ai
+    container_name: botz
+    env_file:
+      - ./backends/botz.ai/.env
+    ports: 
+      - "3000:3000"
+    volumes:
+      - ./backends/botz.ai/cache:/home/root/cache
+  

@@ -1,0 +1,127 @@
+/* General Body Styles */
+body {
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  background: #f4f4f4;
+  color: #333;
+  background-image: url('/DALL-E-2023-11-19-20.08.58.png');
+}
+
+/* Header Styles */
+h1 {
+  background: #333;
+  color: #fff;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+/* Introduction Paragraph Styles */
+.intro {
+  font-size: 18px;
+  padding: 0 20px;
+  margin-bottom: 20px;
+}
+
+/* Article List Styles */
+#article-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px;
+}
+
+#article-list li {
+  background: #fff;
+  margin-bottom: 15px;
+  padding: 15px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Image Styles */
+#article-list img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin-bottom: 15px;
+}
+
+/* Link Styles */
+a {
+  color: #1a0dab;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Navigation Styles */
+.navigation {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.navigation button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  margin: 5px;
+}
+
+.navigation button:hover {
+  background-color: #0056b3;
+}
+
+/* Error Message Styles */
+.error-message {
+  color: red;
+  text-align: center;
+}
+
+/* Spinner Styles */
+.spinner {
+  text-align: center;
+  padding: 30px 0;
+}
+
+.spinner > div {
+  width: 18px;
+  height: 18px;
+  background-color: #333;
+  border-radius: 100%;
+  display: inline-block;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.spinner .bounce1 {
+  animation-delay: -0.32s;
+}
+
+.spinner .bounce2 {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+      transform: scale(0);
+  }
+  40% {
+      transform: scale(1.0);
+  }
+}
+
+.ai-pic {
+  padding: 30px;
+}
+
+@media screen and (max-width: 600px) {
+  .ai-pic {
+      padding: 0px;
+  }
+}
