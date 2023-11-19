@@ -3,6 +3,7 @@ version: '2'
 services:
   nginx:
     build: .
+    restart: always
     container_name: nginx
     ports:
       - "80:80"
@@ -11,6 +12,7 @@ services:
       - ./backends/botz.ai/cache:/usr/share/nginx/html/botz.ai/cache
   botz:
     build: ./backends/botz.ai
+    restart: always
     container_name: botz
     env_file:
       - ./backends/botz.ai/.env
