@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-3HMC4TBL9L"></script>
@@ -12,6 +12,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>botz.ai - AI News</title>
     <link rel="stylesheet" href="style.css">
+    <meta name="description" content="Botz.ai offers the latest news and insights in the world of artificial intelligence. Stay updated with AI trends, breakthroughs, and analysis. Discover how AI is transforming technology and industries worldwide.">
+    <meta name="keywords" content="AI news, artificial intelligence, AI trends, AI breakthroughs, AI analysis, machine learning, deep learning, AI technology, AI in business, AI updates, AI research">
   </head>
   <body>
     <h1>AI News</h1>
@@ -29,13 +31,21 @@
       // Fetch the list of articles from the API endpoint
       let currentDate = new Date();
       const articleList = document.querySelector('#article-list');
-      window.onhashchange = val => {
+      window.onhashchange = () => {
+        loadArticle()
+      }
+
+      // load article based on hash
+      function loadArticle() {
         try {
           let hashKey = window.location.hash.slice(1);
           console.log(hashKey);
+          document.title = `botz.ai - AI News - ${hashKey}`;
           document.querySelector('.intro').innerHTML = '';
           fetchArticles(hashKey);
         } catch (e) {
+          let cacheKey = `${currentDate.getFullYear()}-${padNumber(currentDate.getMonth() + 1)}-${padNumber(currentDate.getDate())}-${padNumber(currentDate.getHours())}`;
+          fetchArticles(cacheKey);
           console.log(e);
         }
       }
@@ -44,8 +54,8 @@
         return number < 10 ? '0' + number : number.toString();
       }
 
-      let cacheKey = `${currentDate.getFullYear()}-${padNumber(currentDate.getMonth() + 1)}-${padNumber(currentDate.getDate())}-${padNumber(currentDate.getHours())}`;
-      fetchArticles(cacheKey);
+      // initial load
+      loadArticle();
       
       function fetchArticles(key) {
 
@@ -97,6 +107,9 @@
             if (articles[0].navigation.next) {
                 nav += `<button style="${buttonStyle}" onclick="window.location.hash='${articles[0].navigation.next}'">Next >></button>`;
             }
+            // if (articles[0].navigation.random) {
+            //     nav += `<button style="${buttonStyle}" onclick="window.location.hash='${articles[0].navigation.random}'">random</button>`;
+            // }
             navigation.innerHTML = nav;
 
             articleList.appendChild(navigation);
