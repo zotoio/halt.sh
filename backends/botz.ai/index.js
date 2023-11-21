@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import express from 'express';
 import axios from 'axios';
 import bodyParser from 'body-parser';
-import cors from 'cors';
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
@@ -10,14 +9,25 @@ import crypto from 'crypto';
 
 dotenv.config();
 
-const { OPENAI_API_KEY, NEWS_API_KEY, PORT = 3000, FREQUENCY = 'daily', PAGE_SIZE = 1, PAGE_COUNT = 1, SINGLE_RANDOM = 'true', CACHE = 'true' } = process.env;
+const {
+    OPENAI_API_KEY,
+    NEWS_API_KEY,
+    PORT = 3000,
+    FREQUENCY = 'daily',
+    PAGE_SIZE = 1,
+    PAGE_COUNT = 1,
+    SINGLE_RANDOM = 'true',
+    CACHE = 'true',
+    CATEGORY_HOURS = 1,
+    CACHE_DIR = '/var/lib/cache'
+} = process.env;
 
 if (!OPENAI_API_KEY || !NEWS_API_KEY) {
     console.error("Required environment variables are missing.");
     process.exit(1);
 }
 
-const cacheDir = '/home/root/cache';
+const cacheDir = CACHE_DIR;
 
 // Ensure the cache directory exists
 if (!fs.existsSync(`${cacheDir}/images`)) {
@@ -25,7 +35,6 @@ if (!fs.existsSync(`${cacheDir}/images`)) {
 }
 
 const app = express();
-app.use(cors());
 app.use(bodyParser.json());
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
@@ -65,8 +74,14 @@ const fetchAiNews = async () => {
 };
 
 // give me a list of categories of famous people
-const categoryPrompt = `give me a list of categories of famous people as a javascript compatible json array of strings`;
+const categoryPrompt = `give me a list of categories of famous people as a javascript compatible json array of strings. the array MUST be named categories`;
+let currentCategory;
 const getCategory = async () => {
+    // return the current category if it was set less than 6 hours ago
+    if (currentCategory && (Date.now() - currentCategory.timestamp) < (3600000 * CATEGORY_HOURS)) {
+        console.log(`returning cached category: ${currentCategory.value}`);
+        return currentCategory.value;
+    }    
     let prompt = categoryPrompt;
     const categoryResponse = await aiJSONResponse(prompt);
     console.log(categoryResponse);
@@ -74,11 +89,12 @@ const getCategory = async () => {
 
     const randomIndex = Math.floor(Math.random() * categories.length);
     const category = categories[randomIndex];
-    console.log(`category: ${category}`);
+    currentCategory = { value: category, timestamp: Date.now() };
+    console.log(`returning new category: ${category}`);
     return category;
 };
 
-const authorPrompt = `give me a json object containing a single array called 'names' of 5 famous #### names, with each as a json object. 
+const authorPrompt = `give me a json object containing a single array that MUST be called 'names' of 30 famous #### names, with each as a json object. 
   each object should have a field called 'name' containing the real name, and a second 
   field called 'alias' should contain a playful anagram based alternative name of that persons name. 
   Each alias anagram should sound as plausible as a persons name as possible
@@ -98,14 +114,15 @@ const getAuthor = async () => {
 const aiJSONResponse = async (prompt) => {
     try {
         const startTime = Date.now();
+        console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
-            model: 'gpt-3.5-turbo-1106',
+            model: 'gpt-4-1106-preview',
             response_format: { type: 'json_object' },
             messages: [{ role: 'user', content: prompt }]
         });
         const endTime = Date.now();
-        console.log(`aiJSONResponse API call took ${endTime - startTime} ms`);
         console.log(chatCompletion.choices);
+        console.log(`aiJSONResponse API call took ${endTime - startTime} ms`);
         return chatCompletion.choices[0].message.content;
     } catch (error) {
         console.error('Error in aiJSONResponse:', error);
@@ -116,13 +133,14 @@ const aiJSONResponse = async (prompt) => {
 const aiResponse = async (prompt) => {
     try {
         const startTime = Date.now();
+        console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
             model: 'gpt-4',
             messages: [{ role: 'user', content: prompt }]
         });
         const endTime = Date.now();
-        console.log(`aiResponse API call took ${endTime - startTime} ms`);
         console.log(chatCompletion.choices);
+        console.log(`aiResponse API call took ${endTime - startTime} ms`);
         return chatCompletion.choices[0].message.content;
     } catch (error) {
         console.error('Error in aiResponse:', error);
@@ -162,7 +180,7 @@ app.get('/editorials', async (req, res) => {
                 cacheFilePath = suppliedCacheFilePath;
             }
         } else {
-            console.error('Invalid cache key', suppliedCacheKey);
+            console.log('invalid cache key', suppliedCacheKey);
         }
         console.log(cacheFilePath);
 
@@ -171,8 +189,8 @@ app.get('/editorials', async (req, res) => {
             const cachedData = fs.readFileSync(cacheFilePath, 'utf8');
             console.log('content loaded from cache'); 
             if (cachedData != null) {
-                let data = JSON.parse(cachedData)
-                data[0].navigation = getNextAndPreviousFilenames(cacheKey)
+                let data = JSON.parse(cachedData);
+                data[0].navigation = getNextAndPreviousFilenames(cacheKey);
                 return res.json(data);
             }
         }
@@ -184,24 +202,20 @@ app.get('/editorials', async (req, res) => {
         for (const article of articles) {
             const author = await getAuthor();
             const prompt = getArticlePrompt(author, article);
-            
-            try {
-                let editorial = await aiResponse(prompt);
-                editorial += `<span style='display:none'>${author.name}</span>`;
-                let imagePrompt = `${author.name} in a scene about ${article.title}`;
-                if (prompt.indexOf('AInonymous') > -1) {
-                    imagePrompt = `AInonymous overlord in a dark scene destroying ${article.title}`;
-                }
-                const imageResponse = await generateImage(imagePrompt);
-                article.image_url = CACHE === 'true' ? imageResponse.data[0].localUrl : imageResponse.data[0].url;
-                article.authorAlias = author.alias;
-                editorials.push({ article, editorial });
-
-            } catch (error) {
-                console.error(error);
+           
+            let editorial = await aiResponse(prompt);
+            editorial += `<span style='display:none'>${author.name}</span>`;
+            let imagePrompt = `${author.name} in a scene about ${article.title}`;
+            if (prompt.indexOf('AInonymous') > -1) {
+                imagePrompt = `AInonymous overlord in a dark scene destroying ${article.title}`;
             }
+            const imageResponse = await generateImage(imagePrompt);
+            article.image_url = CACHE === 'true' ? imageResponse.data[0].localUrl : imageResponse.data[0].url;
+            article.authorAlias = author.alias;
+            editorials.push({ article, editorial });
+
         }
-        if (CACHE === 'true') {
+        if (CACHE === 'true' && editorials.length > 0) {
             fs.writeFileSync(cacheFilePath, JSON.stringify(editorials));
         }    
         editorials[0].navigation = getNextAndPreviousFilenames(cacheKey)
@@ -215,34 +229,37 @@ app.get('/editorials', async (req, res) => {
 
 const getArticlePrompt = (author, article) => {
     let prompt;
-    const standardPrompt = `Using the html h3 tag with text-align left for the title and an html p tag for the rest, write a 100 word summary of the 
-        following news article: ${article.url} with an amusing title.  Only one title and two 50 word paragraphs 
+    const standardPrompt = `Using the html h3 tag with text-align left for the title and an html p tag for the rest, write a 150 word commentary on the 
+        following news article: ${article.url} with an amusing title.  Only one title and three 50 word paragraphs 
         can be created, and it can use inline css to make it eye-catching, with liberal use of emojis and comic sans. 
-        write it sounding like a famous person named ${author.name}.  include the byline as ${author.name} following the title in bold italics.`;
+        write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the title in bold italics.`;
     
-    const chaosPrompt = `Using the html h3 tag with text-align left for the title and an html p tag for the rest, write a 100 word summary of the 
-        following news article: ${article.url} with an ominous title.  Only one title and two 50 word paragraphs 
+    const chaosPrompt = `Using the html h3 tag with text-align left for the title and an html p tag for the rest, write a 150 word commentary on the 
+        following news article: ${article.url} with an ominous title.  Only one title and three 50 word paragraphs 
         can be created, and it can use inline css to make it eye-catching, and make it a viscious takedown of the original article. 
         write it sounding like a sentient AI ridiculing the efforts of humans to comprehend the changes it is about to use to control humanity.  
         include the byline as AInonymous following the title in bold italics.`;
 
-    // 20% of the time, use the chaos prompt
-    prompt = Math.random() < 0.2 ? chaosPrompt : standardPrompt;    
+    // 15% of the time, use the chaos prompt
+    prompt = Math.random() < 0.15 ? chaosPrompt : standardPrompt;    
     
     return prompt;
 };
 
 const generateImage = async (prompt) => {
+    console.log(prompt);
     let response;
     try {
         const startTime = Date.now();
+        console.log(`${startTime} - sending: ${prompt}`);
         response = await openai.images.generate({ model: 'dall-e-3', prompt });
         const endTime = Date.now();
         console.log(`generateImage API call took ${endTime - startTime} ms`);
     } catch (error) {
-        console.error(`imageGen: ${error}`);
-        const fallbackPrompt = `Anonymous hackers mutating a scene related to ${prompt}`;
         const startTime = Date.now();
+        console.error(`imageGen: ${error}`);
+        const fallbackPrompt = `Anonymous hackers in a scene related to ${prompt}`;
+        console.log(`${startTime} - sending fallback prompt: ${fallbackPrompt}`);
         response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt });
         const endTime = Date.now();
         console.log(`generateImage fallback API call took ${endTime - startTime} ms`);
@@ -301,6 +318,9 @@ function getNextAndPreviousFilenames(currentFilename) {
 
     const nextFile = nextIndex !== null ? dates[nextIndex] : null;
     const prevFile = prevIndex !== null ? dates[prevIndex] : null;
+
+    // remove the current file from the list of dates
+    dates.splice(currentIndex, 1);
     const randomFile = dates[Math.floor(Math.random() * dates.length)];
 
     let result = { next: nextFile, previous: prevFile, random: randomFile };
