@@ -19,10 +19,11 @@ const {
     SINGLE_RANDOM = 'true',
     CACHE = 'true',
     CATEGORY_HOURS = 1,
-    CACHE_DIR = '/var/lib/cache'
+    CACHE_DIR = '/var/lib/cache',
+    SHARED_SECRET
 } = process.env;
 
-if (!OPENAI_API_KEY || !NEWS_API_KEY) {
+if (!OPENAI_API_KEY || !NEWS_API_KEY || !SHARED_SECRET) {
     console.error("Required environment variables are missing.");
     process.exit(1);
 }
@@ -167,15 +168,16 @@ app.get('/editorials', async (req, res) => {
         cacheFilePath = `${path.join(cacheDir, defaultCacheKey)}.json`;
 
         let suppliedCacheKey = req.query.cacheKey;
-        // if the suppliedcachekey includes the hour and the frequency is daily, remove the hour
-        if (FREQUENCY === 'daily' && suppliedCacheKey && suppliedCacheKey.length > 10) {
-            suppliedCacheKey = suppliedCacheKey.substring(0, 10) + '-99';
-        }
-        const isValidCacheKey = suppliedCacheKey && /^[0-9-]+$/.test(suppliedCacheKey);
+        
+        // suppliedCacheKey must be: 
+        // 1. only digits and dash
+        // 2. length of either 13 (hour resolution) or 27 (timestamp resolution)
+        // example valid values: 2021-09-01-09, 2021-09-01-99-1630480000000 
+        const isValidCacheKey = suppliedCacheKey && /(\d{4}-\d{2}-\d{2})(-\d{2})(-\d{13})?$/.test(suppliedCacheKey);
 
         if (isValidCacheKey) {
             let suppliedCacheFilePath = `${path.join(cacheDir, suppliedCacheKey)}.json`;
-            if (fs.existsSync(suppliedCacheFilePath)) {
+            if (authorisedAdminRequest(req) || fs.existsSync(suppliedCacheFilePath)) {
                 cacheKey = suppliedCacheKey;
                 cacheFilePath = suppliedCacheFilePath;
             }
@@ -184,7 +186,7 @@ app.get('/editorials', async (req, res) => {
         }
         console.log(cacheFilePath);
 
-        if (CACHE === 'true' && fs.existsSync(cacheFilePath)) {
+        if (!authorisedAdminRequest(req) && CACHE === 'true' && fs.existsSync(cacheFilePath)) {
             // Cache file exists, read and return the cached data
             const cachedData = fs.readFileSync(cacheFilePath, 'utf8');
             console.log('content loaded from cache'); 
@@ -232,7 +234,7 @@ const getArticlePrompt = (author, article) => {
     const standardPrompt = `Using the html h3 tag with text-align left for the title and an html p tag for the rest, write a 150 word commentary on the 
         following news article: ${article.url} with an amusing title.  Only one title and three 50 word paragraphs 
         can be created, and it can use inline css to make it eye-catching, with liberal use of emojis and comic sans. 
-        write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the title in bold italics.`;
+        write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the title in bold italics with css class 'byline'.`;
     
     const chaosPrompt = `Using the html h3 tag with text-align left for the title and an html p tag for the rest, write a 150 word commentary on the 
         following news article: ${article.url} with an ominous title.  Only one title and three 50 word paragraphs 
@@ -287,12 +289,14 @@ const saveImageToFile = async (response) => {
 }
 
 function parseFilename(filename) {
-    const match = filename.match(/(\d{4}-\d{2}-\d{2})(-\d{2})?\.json$/);
+    
+    const match = filename.match(/(\d{4}-\d{2}-\d{2})(-\d{2})(-\d{13})?\.json$/);
     if (!match) return null;
 
     const dateStr = match[1];
     const hourStr = match[2] ? match[2].substring(1) : '99';
-    return `${dateStr}-${hourStr}`;
+    const extraStr = match[3] ? match[3] : '';
+    return `${dateStr}-${hourStr}${extraStr}`;
 }
 
 function getNextAndPreviousFilenames(currentFilename) {
@@ -307,7 +311,7 @@ function getNextAndPreviousFilenames(currentFilename) {
 
     console.log(`dates: ${dates}`);
 
-    const currentIndex = dates.findIndex(date => date.startsWith(currentFilename.substring(0, 13)));
+    const currentIndex = dates.findIndex(date => date === currentFilename.replace('.json', ''));
     console.log(`currentIndex: ${currentIndex}`);
     if (currentIndex === -1) {
         return { next: null, previous: null, randomFile: null };
@@ -321,7 +325,10 @@ function getNextAndPreviousFilenames(currentFilename) {
 
     // remove the current file from the list of dates
     dates.splice(currentIndex, 1);
-    const randomFile = dates[Math.floor(Math.random() * dates.length)];
+
+    // skip forward up to 5 files to get a random file
+    const randomIndex = currentIndex + (Math.floor(Math.random() * 5));
+    const randomFile = dates[randomIndex < dates.length ? randomIndex : 0];
 
     let result = { next: nextFile, previous: prevFile, random: randomFile };
     return result;
@@ -330,6 +337,18 @@ function getNextAndPreviousFilenames(currentFilename) {
 function padNumber(number) {
     return number < 10 ? '0' + number : number.toString();
 }
+
+function authorisedAdminRequest(req) {
+    const suppliedSecret = req.headers['x-shared-secret'];
+    console.log(`local: ${req.connection.localAddress} remote: ${req.connection.remoteAddress}`);
+    const isLocalhost = req.connection.localAddress === req.connection.remoteAddress;
+    const validSecret = suppliedSecret === SHARED_SECRET;
+    const result = validSecret || isLocalhost;
+    if (result) {
+        console.log(`admin request detected from: ${req.connection.remoteAddress} with valid secret? ${validSecret}`);
+    }
+    return result;
+}    
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
