@@ -9,6 +9,7 @@
       gtag('js', new Date());
       gtag('config', 'G-3HMC4TBL9L');
     </script>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>botz.ai - AI News</title>
     <link rel="stylesheet" href="style.css">
@@ -100,6 +101,7 @@
               <p>${article.editorial}</p><span style="display:none" class="byline-alias">by ${article.article.authorAlias}</span>
               <div class="metadata" style="font-size:14px">
                 <p>
+                  Generated: ${article.article.generated_at || article.article.published_at}<br>
                   Original source: ${article.article.source} | ${article.article.published_at}<br>
                   Original title: ${article.article.title}<br>
                   <a href="${article.article.url}">Read Original article</a>

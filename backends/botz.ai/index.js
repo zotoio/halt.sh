@@ -206,13 +206,15 @@ app.get('/editorials', async (req, res) => {
            
             let editorial = await aiResponse(prompt);
             editorial += `<span style='display:none'>${author.name}</span>`;
-let imagePrompt = `${author.name} in a scene about ${article.title}`;
+            let imagePrompt = `${author.name} in a scene about ${article.title}`;
             if (prompt.indexOf('AInonymous') > -1) {
                 imagePrompt = `AInonymous overlord in a dark scene destroying ${article.title}`;
             }
             const imageResponse = await generateImage(imagePrompt);
             article.image_url = CACHE === 'true' ? imageResponse.data[0].localUrl : imageResponse.data[0].url;
             article.authorAlias = author.alias;
+            const now = new Date();
+            article.generated_at = `${now.getFullYear()}-${padNumber(now.getMonth() + 1)}-${padNumber(now.getDate())}-${padNumber(now.getHours())}-${padNumber(now.getMinutes())}-${padNumber(now.getSeconds())}`;
             editorials.push({ article, editorial });
 
         }
