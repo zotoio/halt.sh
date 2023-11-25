@@ -46,9 +46,8 @@ const isWeekend = () => {
     return currentDate.getDay() === 6 || currentDate.getDay() === 0;
 };
 
-let pageCount = PAGE_COUNT;
-
 const fetchAiNews = async () => {
+    let pageCount = PAGE_COUNT;
     if (isWeekend()) {
         pageCount = pageCount * 3;
     }
@@ -95,7 +94,7 @@ const getCategory = async () => {
     return category;
 };
 
-const authorPrompt = `give me a json object containing a single array that MUST be called 'names' of 30 famous #### names, with each as a json object. 
+const authorPrompt = `give me a json object containing a single array that MUST be called 'names' of 10 famous #### names, with each as a json object. 
   each object should have a field called 'name' containing the real name, and a second 
   field called 'alias' should contain a playful anagram based alternative name of that persons name. 
   Each alias anagram should sound as plausible as a persons name as possible
@@ -207,7 +206,7 @@ app.get('/editorials', async (req, res) => {
            
             let editorial = await aiResponse(prompt);
             editorial += `<span style='display:none'>${author.name}</span>`;
-            let imagePrompt = `${author.name} in a scene about ${article.title}`;
+let imagePrompt = `${author.name} in a scene about ${article.title}`;
             if (prompt.indexOf('AInonymous') > -1) {
                 imagePrompt = `AInonymous overlord in a dark scene destroying ${article.title}`;
             }
@@ -231,16 +230,20 @@ app.get('/editorials', async (req, res) => {
 
 const getArticlePrompt = (author, article) => {
     let prompt;
-    const standardPrompt = `Using the html h3 tag with text-align left for the title and an html p tag for the rest, write a 150 word commentary on the 
+    let variations = ['commentary', 'opinion', 'review', 'analysis', 'critique', 'editorial', 'summary', 'rebuttal', 'response', 'take', 'view', 'perspective', 'reaction', 'appraisal', 'assessment', 'examination', 'study', 'criticism', 'dissection', 'dissertation', 'essay', 'exposition'];
+    let randomVariant = variations[Math.floor(Math.random() * variations.length)];
+    console.log(`randomVariant: ${randomVariant}`);
+    const standardPrompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a 150 word ${randomVariant} on the 
         following news article: ${article.url} with an amusing title.  Only one title and three 50 word paragraphs 
         can be created, and it can use inline css to make it eye-catching, with liberal use of emojis and comic sans. 
-        write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the title in bold italics with css class 'byline'.`;
+        write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the 
+        in bold italics with css class 'byline'.  remove any markdown formatting and only return the html itself.`;
     
-    const chaosPrompt = `Using the html h3 tag with text-align left for the title and an html p tag for the rest, write a 150 word commentary on the 
+    const chaosPrompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a 150 word reaction to the 
         following news article: ${article.url} with an ominous title.  Only one title and three 50 word paragraphs 
         can be created, and it can use inline css to make it eye-catching, and make it a viscious takedown of the original article. 
-        write it sounding like a sentient AI ridiculing the efforts of humans to comprehend the changes it is about to use to control humanity.  
-        include the byline as AInonymous following the title in bold italics.`;
+        write it sounding like a sentient AI ridiculing the efforts of humans to comprehend the changes it is has already started to use to control humanity.  
+        include the byline as AInonymous following the title in bold italics. remove any markdown formatting and only return the html itself.`;
 
     // 15% of the time, use the chaos prompt
     prompt = Math.random() < 0.15 ? chaosPrompt : standardPrompt;    
@@ -267,9 +270,8 @@ const generateImage = async (prompt) => {
         console.log(`generateImage fallback API call took ${endTime - startTime} ms`);
     }
 
-    if (CACHE === 'true') {
-        response = saveImageToFile(response);
-    }    
+    response = saveImageToFile(response);
+
     return response;
 };
 
@@ -345,7 +347,7 @@ function authorisedAdminRequest(req) {
     const validSecret = suppliedSecret === SHARED_SECRET;
     const result = validSecret || isLocalhost;
     if (result) {
-        console.log(`admin request detected from: ${req.connection.remoteAddress} with valid secret? ${validSecret}`);
+        console.log(`admin request accepted from: ${req.connection.remoteAddress} with valid secret? ${validSecret}`);
     }
     return result;
 }    
