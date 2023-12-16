@@ -39,7 +39,7 @@ const app = express();
 app.use(bodyParser.json());
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const keywords = ['chatgpt', 'midjourney', 'dall-e', 'openai', 'genai', 'generative ai', 'copilot'];
+const keywords = ['chatgpt', 'midjourney', 'dall-e', 'openai', 'genai', 'generative ai', 'copilot', 'google gemini', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'meta llama'];
 
 const isWeekend = () => {
     const currentDate = new Date();
@@ -49,7 +49,7 @@ const isWeekend = () => {
 const fetchAiNews = async () => {
     let pageCount = PAGE_COUNT;
     if (isWeekend()) {
-        pageCount = pageCount * 3;
+        pageCount = pageCount * 2; // double the number of pages on weekends
     }
     let result = [];
     for (let i = 1; i <= pageCount; i++) {
@@ -67,6 +67,7 @@ const fetchAiNews = async () => {
         const endTime = Date.now();
         console.log(`API call ${i} took ${endTime - startTime} ms`);
         result.push(...response.data.data);
+        console.log(result);
     }
     if (SINGLE_RANDOM === 'true') result = result[Math.floor(Math.random() * result.length)];
     console.log(result);
@@ -202,15 +203,14 @@ app.get('/editorials', async (req, res) => {
 
         for (const article of articles) {
             const author = await getAuthor();
-            const prompt = getArticlePrompt(author, article);
+            const prompt = await getArticlePrompt(author, article);
            
             let editorial = await aiResponse(prompt);
             editorial += `<span style='display:none'>${author.name}</span>`;
-            let imagePrompt = `${author.name} in a scene about ${article.title}`;
-            if (prompt.indexOf('AInonymous') > -1) {
-                imagePrompt = `AInonymous overlord in a dark scene destroying ${article.title}`;
-            }
+
+            let imagePrompt = await getImagePrompt(author.name, article.title, prompt);
             const imageResponse = await generateImage(imagePrompt);
+
             article.image_url = CACHE === 'true' ? imageResponse.data[0].localUrl : imageResponse.data[0].url;
             article.authorAlias = author.alias;
             const now = new Date();
@@ -230,28 +230,83 @@ app.get('/editorials', async (req, res) => {
     }
 });
 
-const getArticlePrompt = (author, article) => {
+const recurrentPhrasesPrompt = `give me a list of the 20 most commonly complained about repetitive phrases used in ChatGPT responses, as observed by internet users as a javascript compatible json array of strings. The array MUST be named recurrentPhrases a JSON array of strings with only alphanumerics and spaces.`;
+let recurrentPhrases = [];
+const getRecurrentPhrases = async () => {
+    if (recurrentPhrases.length > 0) {
+        return recurrentPhrases;
+    }
+    const phrasesResponse = await aiJSONResponse(recurrentPhrasesPrompt);
+    console.log({phrasesResponse});
+    recurrentPhrases = JSON.parse(phrasesResponse).recurrentPhrases;
+    return recurrentPhrases;
+};
+
+const imageStylesPrompt = `give me a list of the 20 most most distinct and unique image styles I can use in dall-e-3 prompts with a bias towards photographic quality as a javascript compatible json array of strings. The array MUST be named imageStyles a JSON array of strings with only alphanumerics and spaces.`;
+let imageStyles = [];
+const getImageStyles = async () => {
+    if (imageStyles.length > 0) {
+        return imageStyles;
+    }
+    const imageStylesResponse = await aiJSONResponse(imageStylesPrompt);
+    console.log({imageStylesResponse});
+    imageStyles = JSON.parse(imageStylesResponse).imageStyles;
+    return imageStyles;
+};
+
+const getArticlePrompt = async (author, article) => {
+    const recurrentPhrases = await getRecurrentPhrases();
     let prompt;
-    let variations = ['commentary', 'opinion', 'review', 'analysis', 'critique', 'editorial', 'summary', 'rebuttal', 'response', 'take', 'view', 'perspective', 'reaction', 'appraisal', 'assessment', 'examination', 'study', 'criticism', 'dissection', 'dissertation', 'essay', 'exposition'];
+    let variations = ['commentary', 'opinion', 'review', 'analysis', 'critique', 'editorial', 'summary', 'rebuttal', 'response', 'take', 'view', 'perspective', 'reaction', 'appraisal', 'assessment', 'examination', 'study', 'criticism', 'dissection', 'dissertation', 'essay', 'exposition', 'celebration'];
     let randomVariant = variations[Math.floor(Math.random() * variations.length)];
     console.log(`randomVariant: ${randomVariant}`);
-    const standardPrompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a 150 word ${randomVariant} on the 
-        following news article: ${article.url} with an amusing title.  Only one title and three 50 word paragraphs 
+    const humorousPrompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
+        following news article: ${article.url} with an amusing title.  Only one title and three roughly 50 word paragraphs 
         can be created, and it can use inline css to make it eye-catching, with liberal use of emojis and comic sans. 
-        write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the 
-        in bold italics with css class 'byline'.  remove any markdown formatting and only return the html itself.`;
+        write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the article title in bold italics with css class 'byline'.  
+        remove any markdown formatting and only return the html itself.`;
+
+    const standardPrompt = `You are an expert professional technologist with deep understanding of technology including the latest developments in GenAI and LLMs. 
+        Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
+        following news article: ${article.url}.  Only one title and three roughly 50 word paragraphs 
+        can be created, include the byline as 'Agent ChatGPT the 4th' following the the article title in bold italics with css class 'byline'.  
+        remove any markdown formatting and only return the html itself.`;    
     
-    const chaosPrompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a 150 word reaction to the 
-        following news article: ${article.url} with an ominous title.  Only one title and three 50 word paragraphs 
+    const chaosPrompt = `Ensure your response is believable and not too tacky or predictable.  Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word reaction to the 
+        following news article: ${article.url} with a somewhat ominous title.  Only one title and three roughly 50 word paragraphs 
         can be created, and it can use inline css to make it eye-catching, and make it a viscious takedown of the original article. 
-        write it sounding like a sentient AI ridiculing the efforts of humans to comprehend the changes it is has already started to use to control humanity.  
+        write it sounding like a sentient AI expressing a ${randomVariant} on the efforts of humans to comprehend the changes it is has already started to use to control humanity.  
         include the byline as AInonymous following the title in bold italics. remove any markdown formatting and only return the html itself.`;
 
-    // 15% of the time, use the chaos prompt
-    prompt = Math.random() < 0.15 ? chaosPrompt : standardPrompt;    
+    const caveat =  ` Ensure that none of the following phrases are used in the article: 'buckle up', 'futile', '${recurrentPhrases.join(', ')}'`;
+    
+    // default prompt
+    prompt = standardPrompt;
+
+    // some of the time lean towards the humorous prompts instead of the standard prompt
+    if (Math.random() < 0.33) {
+        // some of the time, use the chaos prompt instead of the humorous prompt
+        prompt = `${(Math.random() < 0.33 ? chaosPrompt : humorousPrompt)}`;      
+    }
+
+    // always add the caveat
+    prompt += ` ${caveat}`;
     
     return prompt;
 };
+
+//
+
+async function getImagePrompt(authorName, articleTitle, prompt) {
+    const imageStyles = await getImageStyles();
+    // pick a random inage style
+    const randomImageStyle = imageStyles[Math.floor(Math.random() * imageStyles.length)];
+    let imagePrompt = `author ${authorName} in a scene about ${articleTitle} in a suitable ${randomImageStyle} style for the author and topic, with a bias towards high impact photographic quality.`;
+    if (prompt.indexOf('AInonymous') > -1) {
+        imagePrompt = `AInonymous overlord in a dark scene destroying ${articleTitle}`;
+    }
+    return imagePrompt;
+}
 
 const generateImage = async (prompt) => {
     console.log(prompt);
@@ -306,7 +361,7 @@ function parseFilename(filename) {
 function getNextAndPreviousFilenames(currentFilename) {
     console.log(`currentFilename: ${currentFilename}`);
     const files = fs.readdirSync(cacheDir);
-    console.log(`files: ${files}`);
+    //console.log(`files: ${files}`);
 
     const dates = files
         .map(parseFilename)
@@ -335,6 +390,7 @@ function getNextAndPreviousFilenames(currentFilename) {
     const randomFile = dates[randomIndex < dates.length ? randomIndex : 0];
 
     let result = { next: nextFile, previous: prevFile, random: randomFile };
+    console.log(result);
     return result;
 }
 
