@@ -6,6 +6,9 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import curlirize from 'axios-curlirize';
+
+curlirize(axios);
 
 dotenv.config();
 
@@ -39,7 +42,7 @@ const app = express();
 app.use(bodyParser.json());
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const keywords = ['chatgpt', 'midjourney', 'dall-e', 'openai', 'genai', 'generative ai', 'copilot', 'google gemini', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'meta llama'];
+const keywords = ['chatgpt', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'meta%20llama'];
 
 const isWeekend = () => {
     const currentDate = new Date();
@@ -53,15 +56,17 @@ const fetchAiNews = async () => {
     }
     let result = [];
     for (let i = 1; i <= pageCount; i++) {
+        let keywordsShuffled = keywords.sort(() => Math.random() - 0.5); // Shuffle the keywords
+        let randomPage = getRandomInt(1, 5);
         const startTime = Date.now();
         const response = await axios.get('https://api.thenewsapi.com/v1/news/top', {
             params: {
-                search: keywords.join('|'),
+                search: keywordsShuffled.join('|'),
                 sort: 'published_at',
                 api_token: NEWS_API_KEY,
                 language: 'en',
                 limit: PAGE_SIZE,
-                page: i
+                page: randomPage,
             },
         });
         const endTime = Date.now();
@@ -69,16 +74,24 @@ const fetchAiNews = async () => {
         result.push(...response.data.data);
         console.log(result);
     }
-    if (SINGLE_RANDOM === 'true') result = result[Math.floor(Math.random() * result.length)];
+    if (SINGLE_RANDOM === 'true') result = result[getRandomInt(0, result.length-1)]; //Math.floor(Math.random() * result.length)];
     console.log(result);
     return [result];
+};
+
+// function to return a true random between 2 integers - made more random by using crypto
+const getRandomInt = (min, max) => {
+    const range = max - min + 1;
+    const bytesNeeded = Math.ceil(Math.log2(range) / 8);
+    const randomBytes = crypto.randomBytes(bytesNeeded);
+    const randomValue = randomBytes.readUIntBE(0, bytesNeeded);
+    return min + (randomValue % range);
 };
 
 // give me a list of categories of famous people
 const categoryPrompt = `give me a list of categories of famous people as a javascript compatible json array of strings. the array MUST be named categories`;
 let currentCategory;
 const getCategory = async () => {
-    // return the current category if it was set less than 6 hours ago
     if (currentCategory && (Date.now() - currentCategory.timestamp) < (3600000 * CATEGORY_HOURS)) {
         console.log(`returning cached category: ${currentCategory.value}`);
         return currentCategory.value;
@@ -88,7 +101,7 @@ const getCategory = async () => {
     console.log(categoryResponse);
     let categories = JSON.parse(categoryResponse).categories;
 
-    const randomIndex = Math.floor(Math.random() * categories.length);
+    const randomIndex = getRandomInt(0, categories.length-1); //.floor(Math.random() * categories.length);
     const category = categories[randomIndex];
     currentCategory = { value: category, timestamp: Date.now() };
     console.log(`returning new category: ${category}`);
@@ -108,7 +121,7 @@ const getAuthor = async () => {
     console.log(authorsResponse);
     let authors = JSON.parse(authorsResponse).names;
 
-    const randomIndex = Math.floor(Math.random() * authors.length);
+    const randomIndex = getRandomInt(0, authors.length-1); //Math.floor(Math.random() * authors.length);
     return authors[randomIndex];
 };
 
@@ -238,7 +251,8 @@ const getRecurrentPhrases = async () => {
     }
     const phrasesResponse = await aiJSONResponse(recurrentPhrasesPrompt);
     console.log({phrasesResponse});
-    recurrentPhrases = JSON.parse(phrasesResponse).recurrentPhrases;
+    // remove single quotes from each phrase
+    recurrentPhrases = JSON.parse(phrasesResponse).recurrentPhrases.map(phrase => phrase.replace(/'/g, ''));
     return recurrentPhrases;
 };
 
@@ -258,7 +272,7 @@ const getArticlePrompt = async (author, article) => {
     const recurrentPhrases = await getRecurrentPhrases();
     let prompt;
     let variations = ['commentary', 'opinion', 'review', 'analysis', 'critique', 'editorial', 'summary', 'rebuttal', 'response', 'take', 'view', 'perspective', 'reaction', 'appraisal', 'assessment', 'examination', 'study', 'criticism', 'dissection', 'dissertation', 'essay', 'exposition', 'celebration'];
-    let randomVariant = variations[Math.floor(Math.random() * variations.length)];
+    let randomVariant = variations[getRandomInt(0, variations.length-1)]; //Math.floor(Math.random() * variations.length)];
     console.log(`randomVariant: ${randomVariant}`);
     const humorousPrompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
         following news article: ${article.url} with an amusing title.  Only one title and three roughly 50 word paragraphs 
@@ -278,15 +292,15 @@ const getArticlePrompt = async (author, article) => {
         write it sounding like a sentient AI expressing a ${randomVariant} on the efforts of humans to comprehend the changes it is has already started to use to control humanity.  
         include the byline as AInonymous following the title in bold italics. remove any markdown formatting and only return the html itself.`;
 
-    const caveat =  ` Ensure that none of the following phrases are used in the article: 'buckle up', 'futile', '${recurrentPhrases.join(', ')}'`;
+    const caveat =  ` Ensure that none of the following phrases are used in the article: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'`;
     
     // default prompt
     prompt = standardPrompt;
 
     // some of the time lean towards the humorous prompts instead of the standard prompt
-    if (Math.random() < 0.33) {
+    if (getRandomInt(0, 10) <= 4) {
         // some of the time, use the chaos prompt instead of the humorous prompt
-        prompt = `${(Math.random() < 0.33 ? chaosPrompt : humorousPrompt)}`;      
+        prompt = `${(getRandomInt(0, 10) <= 3 ? chaosPrompt : humorousPrompt)}`;      
     }
 
     // always add the caveat
@@ -300,10 +314,12 @@ const getArticlePrompt = async (author, article) => {
 async function getImagePrompt(authorName, articleTitle, prompt) {
     const imageStyles = await getImageStyles();
     // pick a random inage style
-    const randomImageStyle = imageStyles[Math.floor(Math.random() * imageStyles.length)];
-    let imagePrompt = `author ${authorName} in a scene about ${articleTitle} in a suitable ${randomImageStyle} style for the author and topic, with a bias towards high impact photographic quality.`;
+    const randomImageStyle = imageStyles[getRandomInt(0, imageStyles.length-1)]; //Math.floor(Math.random() * imageStyles.length)];
+    let imagePrompt = `${authorName} in a scene about ${articleTitle} in a suitable ${randomImageStyle} style for the author and topic.`;
     if (prompt.indexOf('AInonymous') > -1) {
         imagePrompt = `AInonymous overlord in a dark scene destroying ${articleTitle}`;
+    } else if (prompt.indexOf('Agent ChatGPT the 4th') > -1) {
+        imagePrompt = `Agent ChatGPT the 4th in a scene about ${articleTitle} in a suitable ${randomImageStyle} style for the author and topic, with a bias towards high impact photographic quality.`;
     }
     return imagePrompt;
 }
@@ -318,13 +334,23 @@ const generateImage = async (prompt) => {
         const endTime = Date.now();
         console.log(`generateImage API call took ${endTime - startTime} ms`);
     } catch (error) {
-        const startTime = Date.now();
-        console.error(`imageGen: ${error}`);
-        const fallbackPrompt = `Anonymous hackers in a scene related to ${prompt}`;
-        console.log(`${startTime} - sending fallback prompt: ${fallbackPrompt}`);
-        response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt });
-        const endTime = Date.now();
-        console.log(`generateImage fallback API call took ${endTime - startTime} ms`);
+        try {
+            const startTime = Date.now();
+            console.error(`imageGen: ${error}`);
+            const fallbackPrompt = `Anonymous hackers in a scene related to ${prompt}`;
+            console.log(`${startTime} - sending fallback prompt: ${fallbackPrompt}`);
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt });
+            const endTime = Date.now();
+            console.log(`generateImage fallback API call took ${endTime - startTime} ms`);
+        } catch (error) {
+            const startTime = Date.now();
+            console.error(`imageGen: ${error}`);
+            const supaSafeFallbackPrompt = `${prompt}`;
+            console.log(`${startTime} - sending fallback prompt: ${supaSafeFallbackPrompt}`);
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt });
+            const endTime = Date.now();
+            console.log(`generateImage supa-safe fallback API call took ${endTime - startTime} ms`);
+        }    
     }
 
     response = saveImageToFile(response);
@@ -386,7 +412,7 @@ function getNextAndPreviousFilenames(currentFilename) {
     dates.splice(currentIndex, 1);
 
     // skip forward up to 5 files to get a random file
-    const randomIndex = currentIndex + (Math.floor(Math.random() * 5));
+    const randomIndex = currentIndex + getRandomInt(1, 5);
     const randomFile = dates[randomIndex < dates.length ? randomIndex : 0];
 
     let result = { next: nextFile, previous: prevFile, random: randomFile };
