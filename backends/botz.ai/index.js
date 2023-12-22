@@ -168,6 +168,8 @@ app.get('/editorials', async (req, res) => {
 
         let defaultCacheKey;
         let cacheKey;
+        let cacheFilePath;
+        let suppliedCacheKey = req.query.cacheKey;
         
         if (FREQUENCY === 'daily') {
             defaultCacheKey = `${currentDate.getFullYear()}-${padNumber(currentDate.getMonth() + 1)}-${padNumber(currentDate.getDate())}-99`;
@@ -177,27 +179,33 @@ app.get('/editorials', async (req, res) => {
 
         cacheKey = defaultCacheKey;
 
-        let cacheFilePath;
-        cacheFilePath = `${path.join(cacheDir, defaultCacheKey)}.json`;
-
-        let suppliedCacheKey = req.query.cacheKey;
-        
-        // suppliedCacheKey must be: 
-        // 1. only digits and dash
-        // 2. length of either 13 (hour resolution) or 27 (timestamp resolution)
-        // example valid values: 2021-09-01-09, 2021-09-01-99-1630480000000 
-        const isValidCacheKey = suppliedCacheKey && /(\d{4}-\d{2}-\d{2})(-\d{2})(-\d{13})?$/.test(suppliedCacheKey);
-
-        if (isValidCacheKey) {
-            let suppliedCacheFilePath = `${path.join(cacheDir, suppliedCacheKey)}.json`;
-            if (authorisedAdminRequest(req) || fs.existsSync(suppliedCacheFilePath)) {
-                cacheKey = suppliedCacheKey;
-                cacheFilePath = suppliedCacheFilePath;
-            }
-        } else {
-            console.log('invalid cache key', suppliedCacheKey);
+        // if the request is not from an authorised admin, then use the latest cache file as default
+        if (!authorisedAdminRequest(req)) {
+            cacheKey = getLatestFileCacheKey();
         }
-        console.log(cacheFilePath);
+
+        cacheFilePath = `${path.join(cacheDir, cacheKey)}.json`;
+
+        if (suppliedCacheKey) {
+            // suppliedCacheKey must be: 
+            // 1. only digits and dash
+            // 2. length of either 13 (hour resolution) or 27 (timestamp resolution)
+            // example valid values: 2021-09-01-09, 2021-09-01-99-1630480000000 
+            const isValidCacheKey = suppliedCacheKey && /(\d{4}-\d{2}-\d{2})(-\d{2})(-\d{13})?$/.test(suppliedCacheKey);
+
+            if (isValidCacheKey) {
+                let suppliedCacheFilePath = `${path.join(cacheDir, suppliedCacheKey)}.json`;
+                if (authorisedAdminRequest(req) || fs.existsSync(suppliedCacheFilePath)) {
+                    cacheKey = suppliedCacheKey;
+                    cacheFilePath = suppliedCacheFilePath;
+                }
+            } else {
+                console.log('invalid cache key supplied:', suppliedCacheKey);
+            }
+        }
+
+        console.log('cacheKey:', cacheKey);
+        console.log('cacheFilePath', cacheFilePath);
 
         if (!authorisedAdminRequest(req) && CACHE === 'true' && fs.existsSync(cacheFilePath)) {
             // Cache file exists, read and return the cached data
@@ -403,7 +411,7 @@ function getNextAndPreviousFilenames(currentFilename) {
     }
 
     const nextIndex = currentIndex + 1 < dates.length ? currentIndex + 1 : null;
-    const prevIndex = currentIndex - 1 >= 0 ? currentIndex - 1 : null;
+    const prevIndex = currentIndex - 1 < 0 ? null : currentIndex - 1;
 
     const nextFile = nextIndex !== null ? dates[nextIndex] : null;
     const prevFile = prevIndex !== null ? dates[prevIndex] : null;
@@ -419,6 +427,19 @@ function getNextAndPreviousFilenames(currentFilename) {
     console.log(result);
     return result;
 }
+
+function getLatestFileCacheKey() {
+    const files = fs.readdirSync(cacheDir);
+
+    const dates = files
+        .map(parseFilename)
+        .filter(date => date !== null)
+        .sort((a, b) => a - b).reverse();
+
+    let latestFileCacheKey = dates[0];    
+    console.log(`latestFileCacheKey: ${latestFileCacheKey}`);
+    return latestFileCacheKey;
+}    
 
 function padNumber(number) {
     return number < 10 ? '0' + number : number.toString();
