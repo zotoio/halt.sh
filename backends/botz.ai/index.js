@@ -127,8 +127,8 @@ const getCategory = async () => {
 const authorPrompt = `give me a json object containing a single array that MUST be called 'names' of 10 famous #### names, with each as a json object. 
   each object should have a field called 'name' containing the real name, and a second 
   field called 'alias' should contain a playful anagram based alternative name of that persons name. 
-  Each alias anagram should sound as plausible as a persons name as possible
-  and your entire response MUST pe parsable by the JSON.parse() function in javascript`;
+  Each alias anagram should sound plausible as a persons name as possible
+  and your entire response MUST be parsable by the JSON.parse() function in javascript`;
 
 const getAuthor = async () => {
     const category = await getCategory();
@@ -245,7 +245,7 @@ app.get('/editorials', async (req, res) => {
             let editorial = await aiResponse(prompt);
             editorial += `<span style='display:none'>${author.name}</span>`;
 
-            let imagePrompt = await getImagePrompt(author.name, article.title, prompt);
+            let imagePrompt = await getImagePrompt(prompt);
             const imageResponse = await generateImage(imagePrompt);
 
             article.image_url = CACHE === 'true' ? imageResponse.data[0].localUrl : imageResponse.data[0].url;
@@ -280,7 +280,7 @@ const getRecurrentPhrases = async () => {
     return recurrentPhrases;
 };
 
-const imageStylesPrompt = `give me a list of the 20 most most distinct and unique image styles I can use in dall-e-3 prompts with a bias towards photographic quality as a javascript compatible json array of strings. The array MUST be named imageStyles a JSON array of strings with only alphanumerics and spaces.`;
+const imageStylesPrompt = `give me a list of the 20 most most distinct and unique image styles I can use in dall-e-3 prompts as a javascript compatible json array of strings. The array MUST be named imageStyles a JSON array of strings with only alphanumerics and spaces.`;
 let imageStyles = [];
 const getImageStyles = async () => {
     if (imageStyles.length > 0) {
@@ -307,7 +307,7 @@ const getArticlePrompt = async (author, article) => {
     const standardPrompt = `You are an expert professional technologist with deep understanding of technology including the latest developments in GenAI and LLMs. 
         Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
         following news article: ${article.url}.  Only one title and three roughly 50 word paragraphs 
-        can be created, include the byline as 'Agent ChatGPT the 4th' following the the article title in bold italics with css class 'byline'.  
+        can be created, include the byline as 'Agent ChatGPT' following the the article title in bold italics with css class 'byline'.  
         remove any markdown formatting and only return the html itself.`;    
     
     const chaosPrompt = `Ensure your response is believable and not too tacky or predictable.  Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word reaction to the 
@@ -335,17 +335,22 @@ const getArticlePrompt = async (author, article) => {
 
 //
 
-async function getImagePrompt(authorName, articleTitle, prompt) {
+async function getImagePrompt(prompt) {
     const imageStyles = await getImageStyles();
     // pick a random inage style
     const randomImageStyle = imageStyles[getRandomInt(0, imageStyles.length-1)]; //Math.floor(Math.random() * imageStyles.length)];
-    let imagePrompt = `${authorName} in a scene about ${articleTitle} in a suitable ${randomImageStyle} style for the author and topic.`;
+    let imagePrompt = `create an image generation prompt suitable for this article with a ${randomImageStyle} style : \n\n ${prompt}`;
+    
+    //let imagePrompt = `${authorName} in a scene about ${articleTitle} in a suitable ${randomImageStyle} style for the author and topic.`;
     if (prompt.indexOf('AInonymous') > -1) {
-        imagePrompt = `AInonymous overlord in a dark scene destroying ${articleTitle}`;
-    } else if (prompt.indexOf('Agent ChatGPT the 4th') > -1) {
-        imagePrompt = `A scene about ${articleTitle} in a suitable ${randomImageStyle} style for the topic, with a bias towards high impact photographic quality.`;
-    }
-    return imagePrompt;
+        imagePrompt += `\n\n The author AInonymous is an AI overlord working behind the scenes to control humanity.`;
+    } 
+    //else if (prompt.indexOf('Agent ChatGPT') > -1) {
+    //    imagePrompt += `\n\n The image should have a bias towards high impact photographic quality rather than cgi.`;
+    //}
+
+    const generatedPrompt = await aiResponse(imagePrompt);
+    return generatedPrompt;
 }
 
 const generateImage = async (prompt) => {
@@ -458,7 +463,7 @@ function getLatestFileCacheKey() {
 }    
 
 function padNumber(number) {
-    return number < 10 ? '0' + number : number.toString();
+    return number < 10 ? `0${number}` : number.toString();
 }
 
 function authorisedAdminRequest(req) {
