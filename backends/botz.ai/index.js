@@ -42,19 +42,35 @@ const app = express();
 app.use(bodyParser.json());
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const keywords = ['chatgpt', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'meta%20llama'];
+const keywords = ['llm', 'sora', 'chatgpt', 'chatgpt%20pro', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'gemini%201.5', 'gemini%20pro', 'google%20gemma', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'hugging%20face', 'meta%20llama'];
 
 const isWeekend = () => {
     const currentDate = new Date();
     return currentDate.getDay() === 6 || currentDate.getDay() === 0;
 };
 
-const fetchAiNews = async () => {
+const fetchAiNews = async (req) => {
+    let articleUrl = req.query.articleUrl;
+    let result = [];
+    if (authorisedAdminRequest(req) && articleUrl) {
+        console.log(`admin using supplied article url: ${articleUrl}`);
+
+        let articleUrlHostname = new URL(articleUrl).hostname;
+        let randomDateInLast3days = new Date(Date.now() - getRandomInt(0, 259200000));
+        result = {
+            url: articleUrl,
+            source: articleUrlHostname,
+            published_at: randomDateInLast3days
+        };
+        console.log(result);
+        return [result];
+    }     
+
     let pageCount = PAGE_COUNT;
     if (isWeekend()) {
         pageCount = pageCount * 2; // double the number of pages on weekends
     }
-    let result = [];
+    
     for (let i = 1; i <= pageCount; i++) {
         let keywordsShuffled = keywords.sort(() => Math.random() - 0.5); // Shuffle the keywords
         let randomPage = getRandomInt(1, 5);
@@ -130,7 +146,7 @@ const aiJSONResponse = async (prompt) => {
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
-            model: 'gpt-4-1106-preview',
+            model: 'gpt-4-turbo-preview',
             response_format: { type: 'json_object' },
             messages: [{ role: 'user', content: prompt }]
         });
@@ -219,7 +235,7 @@ app.get('/editorials', async (req, res) => {
         }
     
         console.log('no cached content'); 
-        const articles = await fetchAiNews();
+        const articles = await fetchAiNews(req);
         const editorials = [];
 
         for (const article of articles) {

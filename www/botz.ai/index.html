@@ -111,6 +111,8 @@
                 ${article.article.image_url ? `<img class="ai-pic" src="${article.article.image_url}" 
                 alt="${article.article.authorAlias}" width="400px" height="400px" style="float:right">
                 ` : ``}`;
+              article.editorial = article.editorial.replaceAll('```html\n', '');  
+              article.editorial = article.editorial.replaceAll('\n```', '');
               li.innerHTML += ` 
               <p>${article.editorial}</p><span style="display:none" class="byline-alias">by ${article.article.authorAlias}</span>
               <div class="metadata" style="font-size:14px">
