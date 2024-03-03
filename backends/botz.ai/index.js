@@ -165,7 +165,7 @@ const aiResponse = async (prompt) => {
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
-            model: 'gpt-4',
+            model: 'gpt-4-turbo-preview',
             messages: [{ role: 'user', content: prompt }]
         });
         const endTime = Date.now();
@@ -322,9 +322,9 @@ const getArticlePrompt = async (author, article) => {
     prompt = standardPrompt;
 
     // some of the time lean towards the humorous prompts instead of the standard prompt
-    if (getRandomInt(0, 10) <= 4) {
+    if (getRandomInt(0, 10) <= 2) {
         // some of the time, use the chaos prompt instead of the humorous prompt
-        prompt = `${(getRandomInt(0, 10) <= 3 ? chaosPrompt : humorousPrompt)}`;      
+        prompt = `${(getRandomInt(0, 10) <= 4 ? chaosPrompt : humorousPrompt)}`;      
     }
 
     // always add the caveat
@@ -343,7 +343,7 @@ async function getImagePrompt(authorName, articleTitle, prompt) {
     if (prompt.indexOf('AInonymous') > -1) {
         imagePrompt = `AInonymous overlord in a dark scene destroying ${articleTitle}`;
     } else if (prompt.indexOf('Agent ChatGPT the 4th') > -1) {
-        imagePrompt = `Agent ChatGPT the 4th in a scene about ${articleTitle} in a suitable ${randomImageStyle} style for the author and topic, with a bias towards high impact photographic quality.`;
+        imagePrompt = `A scene about ${articleTitle} in a suitable ${randomImageStyle} style for the topic, with a bias towards high impact photographic quality.`;
     }
     return imagePrompt;
 }
