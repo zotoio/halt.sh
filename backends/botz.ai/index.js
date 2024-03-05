@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import curlirize from 'axios-curlirize';
+import cheerio from 'cheerio';
 
 curlirize(axios);
 
@@ -57,8 +58,15 @@ const fetchAiNews = async (req) => {
 
         let articleUrlHostname = new URL(articleUrl).hostname;
         let randomDateInLast3days = new Date(Date.now() - getRandomInt(0, 259200000));
+
+        const articleHtml = await axios.get(articleUrl);
+        const html = articleHtml.data;
+
+        // Use Cheerio to parse the HTML
+        const $ = cheerio.load(html);
         result = {
             url: articleUrl,
+            title: $('title').text(),
             source: articleUrlHostname,
             published_at: randomDateInLast3days
         };
@@ -239,13 +247,13 @@ app.get('/editorials', async (req, res) => {
         const editorials = [];
 
         for (const article of articles) {
-            const author = await getAuthor();
-            const prompt = await getArticlePrompt(author, article);
+            
+            const {prompt, author} = await getArticlePrompt(article);
            
             let editorial = await aiResponse(prompt);
             editorial += `<span style='display:none'>${author.name}</span>`;
 
-            let imagePrompt = await getImagePrompt(prompt);
+            let imagePrompt = await getImagePrompt(editorial);
             const imageResponse = await generateImage(imagePrompt);
 
             article.image_url = CACHE === 'true' ? imageResponse.data[0].localUrl : imageResponse.data[0].url;
@@ -292,62 +300,68 @@ const getImageStyles = async () => {
     return imageStyles;
 };
 
-const getArticlePrompt = async (author, article) => {
+const getArticlePrompt = async (article) => {
     const recurrentPhrases = await getRecurrentPhrases();
     let prompt;
     let variations = ['commentary', 'opinion', 'review', 'analysis', 'critique', 'editorial', 'summary', 'rebuttal', 'response', 'take', 'view', 'perspective', 'reaction', 'appraisal', 'assessment', 'examination', 'study', 'criticism', 'dissection', 'dissertation', 'essay', 'exposition', 'celebration'];
     let randomVariant = variations[getRandomInt(0, variations.length-1)]; //Math.floor(Math.random() * variations.length)];
     console.log(`randomVariant: ${randomVariant}`);
-    const humorousPrompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
-        following news article: ${article.url} with an amusing title.  Only one title and three roughly 50 word paragraphs 
-        can be created, and it can use inline css to make it eye-catching, with liberal use of emojis and comic sans. 
-        write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the article title in bold italics with css class 'byline'.  
-        remove any markdown formatting and only return the html itself.`;
-
-    const standardPrompt = `You are an expert professional technologist with deep understanding of technology including the latest developments in GenAI and LLMs. 
+    
+    // standard prompt
+    let author = {
+        name: 'Agent ChatGPT',
+        alias: 'Apt Gnat Tech'
+    };
+    prompt = `You are an expert professional technologist with deep understanding of coding and the latest developments in GenAI and LLMs. 
         Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
         following news article: ${article.url}.  Only one title and three roughly 50 word paragraphs 
-        can be created, include the byline as 'Agent ChatGPT' following the the article title in bold italics with css class 'byline'.  
+        can be created, include the byline as '${author.name}' following the the article title in bold italics with css class 'byline'.  
         remove any markdown formatting and only return the html itself.`;    
-    
-    const chaosPrompt = `Ensure your response is believable and not too tacky or predictable.  Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word reaction to the 
-        following news article: ${article.url} with a somewhat ominous title.  Only one title and three roughly 50 word paragraphs 
-        can be created, and it can use inline css to make it eye-catching, and make it a viscious takedown of the original article. 
-        write it sounding like a sentient AI expressing a ${randomVariant} on the efforts of humans to comprehend the changes it is has already started to use to control humanity.  
-        include the byline as AInonymous following the title in bold italics. remove any markdown formatting and only return the html itself.`;
-
-    const caveat =  ` Ensure that none of the following phrases are used in the article: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'`;
-    
-    // default prompt
-    prompt = standardPrompt;
 
     // some of the time lean towards the humorous prompts instead of the standard prompt
     if (getRandomInt(0, 10) <= 2) {
         // some of the time, use the chaos prompt instead of the humorous prompt
-        prompt = `${(getRandomInt(0, 10) <= 4 ? chaosPrompt : humorousPrompt)}`;      
+        if (getRandomInt(0, 10) <= 4) {
+            author = {
+                name: 'AInonymous',
+                alias: 'V'
+            };
+            prompt = `Ensure your response is believable and not too tacky or predictable.  Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word reaction to the 
+            following news article: ${article.url} with a somewhat ominous title.  Only one title and three roughly 50 word paragraphs 
+            can be created, and it can use inline css to make it eye-catching, and make it a viscious takedown of the original article. 
+            write it sounding like a sentient AI expressing a ${randomVariant} on the efforts of humans to comprehend the changes it is has already started to use to control humanity.  
+            include the byline as '${author.name}' following the title in bold italics. remove any markdown formatting and only return the html itself.`;
+        } else {
+            author = await getAuthor();
+            prompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
+                following news article: ${article.url} with an amusing title.  Only one title and three roughly 50 word paragraphs 
+                can be created, and it can use inline css to make it eye-catching, with liberal use of emojis and comic sans. 
+                write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the article title in bold italics with css class 'byline'.  
+                remove any markdown formatting and only return the html itself.`;
+        }
+            
     }
+
+    const caveat =  ` Ensure that none of the following phrases are used in the article: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'`;
 
     // always add the caveat
     prompt += ` ${caveat}`;
     
-    return prompt;
+    return {prompt, author};
 };
 
-//
-
-async function getImagePrompt(prompt) {
+async function getImagePrompt(article) {
     const imageStyles = await getImageStyles();
     // pick a random inage style
-    const randomImageStyle = imageStyles[getRandomInt(0, imageStyles.length-1)]; //Math.floor(Math.random() * imageStyles.length)];
-    let imagePrompt = `create an image generation prompt suitable for this article with a ${randomImageStyle} style : \n\n ${prompt}`;
+    const randomImageStyle = imageStyles[getRandomInt(0, imageStyles.length-1)]; 
+    let imagePrompt = `create an image generation prompt suitable for this article with a ${randomImageStyle} style : \n\n ${article}`;
     
-    //let imagePrompt = `${authorName} in a scene about ${articleTitle} in a suitable ${randomImageStyle} style for the author and topic.`;
-    if (prompt.indexOf('AInonymous') > -1) {
+    if (article.indexOf('AInonymous') > -1) {
         imagePrompt += `\n\n The author AInonymous is an AI overlord working behind the scenes to control humanity.`;
     } 
-    //else if (prompt.indexOf('Agent ChatGPT') > -1) {
-    //    imagePrompt += `\n\n The image should have a bias towards high impact photographic quality rather than cgi.`;
-    //}
+    if (article.indexOf('Agent ChatGPT') > -1) {
+        imagePrompt += `\n\n The image should have a bias towards high impact photographic quality rather than cgi.`;
+    }
 
     const generatedPrompt = await aiResponse(imagePrompt);
     return generatedPrompt;
