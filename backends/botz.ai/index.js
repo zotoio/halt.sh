@@ -43,7 +43,7 @@ const app = express();
 app.use(bodyParser.json());
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const keywords = ['llm', 'sora', 'chatgpt', 'chatgpt%20pro', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'gemini%201.5', 'gemini%20pro', 'google%20gemma', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'hugging%20face', 'meta%20llama'];
+const keywords = ['llm', 'sora', 'chatgpt', 'chatgpt%20pro', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'gemini%201.5', 'gemini%20pro', 'google%20gemma', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'gpt-4o', 'hugging%20face', 'meta%20llama'];
 
 const isWeekend = () => {
     const currentDate = new Date();
@@ -154,7 +154,7 @@ const aiJSONResponse = async (prompt) => {
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
-            model: 'gpt-4-turbo-preview',
+            model: 'gpt-4o',
             response_format: { type: 'json_object' },
             messages: [{ role: 'user', content: prompt }]
         });
@@ -168,12 +168,13 @@ const aiJSONResponse = async (prompt) => {
     }
 };
 
-const aiResponse = async (prompt) => {
+const aiResponse = async (prompt, model) => {
     try {
+        const modelName = model ? model : 'gpt-4o';
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
-            model: 'gpt-4-turbo-preview',
+            model: modelName,
             messages: [{ role: 'user', content: prompt }]
         });
         const endTime = Date.now();
@@ -312,9 +313,12 @@ const getArticlePrompt = async (article) => {
         name: 'Agent ChatGPT',
         alias: 'Apt Gnat Tech'
     };
+
+    let articleReduction = await extractKeyPoints(article);
+
     prompt = `You are an expert professional technologist with deep understanding of coding and the latest developments in GenAI and LLMs. 
         Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
-        following news article: ${article.url}.  Only one title and three roughly 50 word paragraphs 
+        following news article: ${article.url}, that expresses the following key points without phrase duplication: ${articleReduction}.  Only one title and three roughly 50 word paragraphs 
         can be created, include the byline as '${author.name}' following the the article title in bold italics with css class 'byline'.  
         remove any markdown formatting and only return the html itself.`;    
 
@@ -349,6 +353,23 @@ const getArticlePrompt = async (article) => {
     
     return {prompt, author};
 };
+
+// use gpt-3-turbo to extract key points from article
+async function extractKeyPoints(article) {
+    const articleHtml = await axios.get(article.url);
+    let html = articleHtml.data;
+    html = html.substring(html.indexOf('article'), html.length);
+
+    // Use Cheerio to parse the HTML
+    const $ = cheerio.load(html);
+    const body = $('div').text();
+    let stripped = body.trim().split(/[\s,\t,\n]+/).join(' ');
+    const articleText = stripped.substring(0, 16000);
+
+    const prompt = `summarise the key points in the following article text ignoring topics that are not related the primary topic it contains.  IMPORTANT! : Never use the same wording in either the title or body, and remove anything that looks like javascript or css: body='${articleText}'`;
+    let extraction = await aiResponse(prompt, 'gpt-3.5-turbo');
+    return extraction;
+}
 
 async function getImagePrompt(article) {
     const imageStyles = await getImageStyles();
@@ -471,7 +492,7 @@ function getLatestFileCacheKey() {
         .filter(date => date !== null)
         .sort((a, b) => a - b).reverse();
 
-    let latestFileCacheKey = dates[0];    
+    let latestFileCacheKey = dates[0] || '1974-10-21-00';    
     console.log(`latestFileCacheKey: ${latestFileCacheKey}`);
     return latestFileCacheKey;
 }    
