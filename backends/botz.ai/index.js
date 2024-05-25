@@ -96,7 +96,7 @@ const fetchAiNews = async (req) => {
         const endTime = Date.now();
         console.log(`API call ${i} took ${endTime - startTime} ms`);
         result.push(...response.data.data);
-        console.log(result);
+        //console.log(result);
     }
     if (SINGLE_RANDOM === 'true') result = result[getRandomInt(0, result.length-1)]; //Math.floor(Math.random() * result.length)];
     console.log(result);
@@ -122,7 +122,7 @@ const getCategory = async () => {
     }    
     let prompt = categoryPrompt;
     const categoryResponse = await aiJSONResponse(prompt);
-    console.log(categoryResponse);
+    //console.log(categoryResponse);
     let categories = JSON.parse(categoryResponse).categories;
 
     const randomIndex = getRandomInt(0, categories.length-1); //.floor(Math.random() * categories.length);
@@ -142,7 +142,7 @@ const getAuthor = async () => {
     const category = await getCategory();
     let prompt = authorPrompt.replace('####', category);
     const authorsResponse = await aiJSONResponse(prompt);
-    console.log(authorsResponse);
+    //console.log(authorsResponse);
     let authors = JSON.parse(authorsResponse).names;
 
     const randomIndex = getRandomInt(0, authors.length-1); //Math.floor(Math.random() * authors.length);
@@ -283,7 +283,7 @@ const getRecurrentPhrases = async () => {
         return recurrentPhrases;
     }
     const phrasesResponse = await aiJSONResponse(recurrentPhrasesPrompt);
-    console.log({phrasesResponse});
+    //console.log({phrasesResponse});
     // remove single quotes from each phrase
     recurrentPhrases = JSON.parse(phrasesResponse).recurrentPhrases.map(phrase => phrase.replace(/'/g, ''));
     return recurrentPhrases;
@@ -296,7 +296,7 @@ const getImageStyles = async () => {
         return imageStyles;
     }
     const imageStylesResponse = await aiJSONResponse(imageStylesPrompt);
-    console.log({imageStylesResponse});
+    //console.log({imageStylesResponse});
     imageStyles = JSON.parse(imageStylesResponse).imageStyles;
     return imageStyles;
 };
@@ -314,11 +314,11 @@ const getArticlePrompt = async (article) => {
         alias: 'Apt Gnat Tech'
     };
 
-    let articleReduction = await extractKeyPoints(article);
+    let articleSummary = await extractSummary(article);
 
     prompt = `You are an expert professional technologist with deep understanding of coding and the latest developments in GenAI and LLMs. 
-        Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
-        following news article: ${article.url}, that expresses the following key points without phrase duplication: ${articleReduction}.  Only one title and three roughly 50 word paragraphs 
+        Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} of the 
+        following news article: ${article.url}. Only one title and three roughly 50 word paragraphs 
         can be created, include the byline as '${author.name}' following the the article title in bold italics with css class 'byline'.  
         remove any markdown formatting and only return the html itself.`;    
 
@@ -331,14 +331,14 @@ const getArticlePrompt = async (article) => {
                 alias: 'V'
             };
             prompt = `Ensure your response is believable and not too tacky or predictable.  Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word reaction to the 
-            following news article: ${article.url} with a somewhat ominous title.  Only one title and three roughly 50 word paragraphs 
+            following news article: ${article.url} with a somewhat ominous title. Only one title and three roughly 50 word paragraphs 
             can be created, and it can use inline css to make it eye-catching, and make it a viscious takedown of the original article. 
             write it sounding like a sentient AI expressing a ${randomVariant} on the efforts of humans to comprehend the changes it is has already started to use to control humanity.  
             include the byline as '${author.name}' following the title in bold italics. remove any markdown formatting and only return the html itself.`;
         } else {
             author = await getAuthor();
             prompt = `Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} on the 
-                following news article: ${article.url} with an amusing title.  Only one title and three roughly 50 word paragraphs 
+                following news article: ${article.url} with an amusing title. Only one title and three roughly 50 word paragraphs 
                 can be created, and it can use inline css to make it eye-catching, with liberal use of emojis and comic sans. 
                 write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the article title in bold italics with css class 'byline'.  
                 remove any markdown formatting and only return the html itself.`;
@@ -346,7 +346,11 @@ const getArticlePrompt = async (article) => {
             
     }
 
-    const caveat =  ` Ensure that none of the following phrases are used in the article: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'`;
+    if (articleSummary) {
+        prompt += ` Here is some more info relevant to the article that may help you create an insightful response: ${articleSummary} `;
+    }
+
+    const caveat = ` IMPORTANT: Ensure that none of the following phrases are used in the article: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'`;
 
     // always add the caveat
     prompt += ` ${caveat}`;
@@ -355,20 +359,27 @@ const getArticlePrompt = async (article) => {
 };
 
 // use gpt-3-turbo to extract key points from article
-async function extractKeyPoints(article) {
-    const articleHtml = await axios.get(article.url);
-    let html = articleHtml.data;
-    html = html.substring(html.indexOf('article'), html.length);
+async function extractSummary(article) {
+    let summary = article.description || '';
+    try {
+        const response = await axios.get(article.url);
+        if (!response.status >= 400) throw new Error(`http status code ${response.status} indicates failure: ${response}`);
+        let html = response.data;
+        html = html.substring(html.indexOf('article'), html.length);
 
-    // Use Cheerio to parse the HTML
-    const $ = cheerio.load(html);
-    const body = $('div').text();
-    let stripped = body.trim().split(/[\s,\t,\n]+/).join(' ');
-    const articleText = stripped.substring(0, 16000);
+        // Use Cheerio to parse the HTML
+        const $ = cheerio.load(html);
+        const body = $('div').text();
+        const stripped = body.trim().split(/[\s,\t,\n]+/).join(' ');
+        let articleText = stripped.substring(0, 16000);
 
-    const prompt = `summarise the key points in the following article text ignoring topics that are not related the primary topic it contains.  IMPORTANT! : Never use the same wording in either the title or body, and remove anything that looks like javascript or css: body='${articleText}'`;
-    let extraction = await aiResponse(prompt, 'gpt-3.5-turbo');
-    return extraction;
+        const prompt = `summarise the important details in the following article text ignoring topics that are not related the primary topic of the article.  IMPORTANT! : Never use the same wording as the original text, and remove anything that looks like javascript or css.  Here is the article text: "${articleText}"`;
+        summary += '' + await aiResponse(prompt, 'gpt-3.5-turbo');
+
+    } catch (e) {
+        console.error(`summary extraction error: ${e}`);
+    }
+    return summary;
 }
 
 async function getImagePrompt(article) {
@@ -393,8 +404,8 @@ const generateImage = async (prompt) => {
     let response;
     try {
         const startTime = Date.now();
-        console.log(`${startTime} - sending: ${prompt}`);
-        response = await openai.images.generate({ model: 'dall-e-3', prompt });
+        //console.log(`${startTime} - sending: ${prompt}`);
+        response = await openai.images.generate({ model: 'dall-e-3', prompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid', quality: 'hd'});
         const endTime = Date.now();
         console.log(`generateImage API call took ${endTime - startTime} ms`);
     } catch (error) {
@@ -403,7 +414,7 @@ const generateImage = async (prompt) => {
             console.error(`imageGen: ${error}`);
             const fallbackPrompt = `Anonymous hackers in a scene related to ${prompt}`;
             console.log(`${startTime} - sending fallback prompt: ${fallbackPrompt}`);
-            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt });
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid', quality: 'hd' });
             const endTime = Date.now();
             console.log(`generateImage fallback API call took ${endTime - startTime} ms`);
         } catch (error) {
@@ -411,7 +422,7 @@ const generateImage = async (prompt) => {
             console.error(`imageGen: ${error}`);
             const supaSafeFallbackPrompt = `${prompt}`;
             console.log(`${startTime} - sending fallback prompt: ${supaSafeFallbackPrompt}`);
-            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt });
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid', quality: 'hd' });
             const endTime = Date.now();
             console.log(`generateImage supa-safe fallback API call took ${endTime - startTime} ms`);
         }    
@@ -458,7 +469,7 @@ function getNextAndPreviousFilenames(currentFilename) {
         .filter(date => date !== null)
         .sort((a, b) => a - b).reverse();
 
-    console.log(`dates: ${dates}`);
+    //console.log(`dates: ${dates}`);
 
     const currentIndex = dates.findIndex(date => date === currentFilename.replace('.json', ''));
     console.log(`currentIndex: ${currentIndex}`);
