@@ -537,6 +537,8 @@ app.get('/cached-images', (req, res) => {
         return fileB.ctimeMs - fileA.ctimeMs;
     });
 
+    files = files.slice(0, 23);
+
     const images = files.map(file => `/cache/images/${file}`);
 
     res.json(images);
