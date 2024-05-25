@@ -527,10 +527,15 @@ function authorisedAdminRequest(req) {
 // an express route that responds with the latest cached images
 app.get('/cached-images', (req, res) => {
 
-    // read the files in date order descending
+    // read the files
     let files = fs.readdirSync(`${cacheDir}/images`);
-    files = files.sort((a, b) => b.localeCompare(a));
-    files = files.slice(0, 24);
+
+    // sort the files in created date descending
+    files.sort((a, b) => {
+        const fileA = fs.statSync(`${cacheDir}/images/${a}`);
+        const fileB = fs.statSync(`${cacheDir}/images/${b}`);
+        return fileB.ctimeMs - fileA.ctimeMs;
+    });
 
     const images = files.map(file => `/cache/images/${file}`);
 

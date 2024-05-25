@@ -35,8 +35,8 @@
    
     <ul id="article-list"></ul>
     <p class="error-message"></p>
-    <a href="" id="gallery">recent images</a>
-    <div id="image-container"></div>
+    <a href="" id="gallery">show recent images</a>
+    <div id="image-container" style="display:none"></div>
     <script>
       // Fetch the list of articles from the API endpoint
       let currentDate = new Date();
@@ -192,7 +192,17 @@
 
       document.querySelector('#gallery').onclick = (event) => {
         event.preventDefault();
-        document.getElementById('image-container').innerHTML = '<h3>Gallery</h3>';
+
+        // toggle visiblity of the image-container when the #gallery is clicked
+        const imageContainer = document.getElementById('image-container');
+        if (imageContainer.style.display === 'none') {
+          imageContainer.style.display = 'block';
+          document.querySelector('#gallery').textContent = 'hide recent images';
+        } else {
+          imageContainer.style.display = 'none';
+          document.querySelector('#gallery').textContent = 'show recent images';
+        }
+
         fetch('/cached-images')
           .then(response => response.json())
           .then(images => {
