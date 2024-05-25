@@ -157,3 +157,15 @@ nav button:hover {
       width: 100%;
   }
 }
+
+#image-container{
+  width: 100%;
+}
+
+.gallery-image {
+  width: 100%;
+}
+
+#gallery {
+  margin: 20px;
+}

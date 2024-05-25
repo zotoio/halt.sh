@@ -35,7 +35,8 @@
    
     <ul id="article-list"></ul>
     <p class="error-message"></p>
-
+    <a href="" id="gallery">recent images</a>
+    <div id="image-container"></div>
     <script>
       // Fetch the list of articles from the API endpoint
       let currentDate = new Date();
@@ -187,6 +188,23 @@
             articleList.innerHTML = '<li>Failed to load articles</li>';
             throw error;
           });
+      }  
+
+      document.querySelector('#gallery').onclick = (event) => {
+        event.preventDefault();
+        document.getElementById('image-container').innerHTML = '<h3>Gallery</h3>';
+        fetch('/cached-images')
+          .then(response => response.json())
+          .then(images => {
+            const container = document.getElementById('image-container');
+            images.forEach(image => {
+              const img = document.createElement('img');
+              img.src = image;
+              img.className = 'gallery-image';
+              container.appendChild(img);
+            });
+          })
+          .catch(error => console.error('Error:', error));
       }  
     </script>
   </body>

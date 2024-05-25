@@ -524,6 +524,20 @@ function authorisedAdminRequest(req) {
     return result;
 }    
 
+// an express route that responds with the latest cached images
+app.get('/cached-images', (req, res) => {
+
+    // read the files in date order descending
+    let files = fs.readdirSync(`${cacheDir}/images`);
+    files = files.sort((a, b) => b.localeCompare(a));
+    files = files.slice(0, 24);
+
+    const images = files.map(file => `/cache/images/${file}`);
+
+    res.json(images);
+});
+
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
