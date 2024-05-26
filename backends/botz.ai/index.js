@@ -405,7 +405,7 @@ const generateImage = async (prompt) => {
     try {
         const startTime = Date.now();
         //console.log(`${startTime} - sending: ${prompt}`);
-        response = await openai.images.generate({ model: 'dall-e-3', prompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid', quality: 'hd'});
+        response = await openai.images.generate({ model: 'dall-e-3', prompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
         const endTime = Date.now();
         console.log(`generateImage API call took ${endTime - startTime} ms`);
     } catch (error) {
@@ -414,7 +414,7 @@ const generateImage = async (prompt) => {
             console.error(`imageGen: ${error}`);
             const fallbackPrompt = `Anonymous hackers in a scene related to ${prompt}`;
             console.log(`${startTime} - sending fallback prompt: ${fallbackPrompt}`);
-            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid', quality: 'hd' });
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
             const endTime = Date.now();
             console.log(`generateImage fallback API call took ${endTime - startTime} ms`);
         } catch (error) {
@@ -422,7 +422,7 @@ const generateImage = async (prompt) => {
             console.error(`imageGen: ${error}`);
             const supaSafeFallbackPrompt = `${prompt}`;
             console.log(`${startTime} - sending fallback prompt: ${supaSafeFallbackPrompt}`);
-            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid', quality: 'hd' });
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
             const endTime = Date.now();
             console.log(`generateImage supa-safe fallback API call took ${endTime - startTime} ms`);
         }    
