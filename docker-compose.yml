@@ -1,5 +1,3 @@
-version: '2'
-
 services:
   nginx:
     build: .
@@ -20,4 +18,11 @@ services:
       - "3000:3000"
     volumes:
       - ./backends/botz.ai/cache:/home/root/cache
+  discord:
+    build: ./backends/discord
+    restart: always
+    container_name: discord
+    env_file:
+      - ./backends/discord/.env
+        
   

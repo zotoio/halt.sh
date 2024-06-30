@@ -22,9 +22,12 @@ const {
     PAGE_COUNT = 1,
     SINGLE_RANDOM = 'true',
     CACHE = 'true',
-    CATEGORY_HOURS = 1,
+    CATEGORY_HOURS = 12,
     CACHE_DIR = '/var/lib/cache',
-    SHARED_SECRET
+    SHARED_SECRET,
+    CF_ZONE_ID,
+    CF_API_TOKEN,
+    EDITORIAL_API_URL_PREFIX
 } = process.env;
 
 if (!OPENAI_API_KEY || !NEWS_API_KEY || !SHARED_SECRET) {
@@ -72,13 +75,13 @@ const fetchAiNews = async (req) => {
         };
         console.log(result);
         return [result];
-    }     
+    }
 
     let pageCount = PAGE_COUNT;
     if (isWeekend()) {
         pageCount = pageCount * 2; // double the number of pages on weekends
     }
-    
+
     for (let i = 1; i <= pageCount; i++) {
         let keywordsShuffled = keywords.sort(() => Math.random() - 0.5); // Shuffle the keywords
         let randomPage = getRandomInt(1, 5);
@@ -98,7 +101,7 @@ const fetchAiNews = async (req) => {
         result.push(...response.data.data);
         //console.log(result);
     }
-    if (SINGLE_RANDOM === 'true') result = result[getRandomInt(0, result.length-1)]; //Math.floor(Math.random() * result.length)];
+    if (SINGLE_RANDOM === 'true') result = result[getRandomInt(0, result.length - 1)]; 
     console.log(result);
     return [result];
 };
@@ -114,21 +117,19 @@ const getRandomInt = (min, max) => {
 
 // give me a list of categories of famous people
 const categoryPrompt = `give me a list of categories of famous people as a javascript compatible json array of strings. the array MUST be named categories`;
-let currentCategory;
+let categories;
 const getCategory = async () => {
-    if (currentCategory && (Date.now() - currentCategory.timestamp) < (3600000 * CATEGORY_HOURS)) {
-        console.log(`returning cached category: ${currentCategory.value}`);
-        return currentCategory.value;
-    }    
-    let prompt = categoryPrompt;
-    const categoryResponse = await aiJSONResponse(prompt);
-    //console.log(categoryResponse);
-    let categories = JSON.parse(categoryResponse).categories;
+    if (categories && categories.timestamp && (Date.now() - categories.timestamp) < (3600000 * CATEGORY_HOURS)) {
+        console.log(`using cached categories: ${categories}`);
+    } else {
+        const categoryResponse = await aiJSONResponse(categoryPrompt);
+        categories = { values: JSON.parse(categoryResponse).categories, timestamp: Date.now() };
+        console.log(`#### new categories ${categories}`);
+    }
+    const randomIndex = getRandomInt(0, categories.values.length - 1);
+    const category = categories.values[randomIndex];
 
-    const randomIndex = getRandomInt(0, categories.length-1); //.floor(Math.random() * categories.length);
-    const category = categories[randomIndex];
-    currentCategory = { value: category, timestamp: Date.now() };
-    console.log(`returning new category: ${category}`);
+    console.log(`returning category: ${category}`);
     return category;
 };
 
@@ -138,15 +139,21 @@ const authorPrompt = `give me a json object containing a single array that MUST 
   Each alias anagram should sound plausible as a persons name as possible
   and your entire response MUST be parsable by the JSON.parse() function in javascript`;
 
+let authors;
 const getAuthor = async () => {
-    const category = await getCategory();
-    let prompt = authorPrompt.replace('####', category);
-    const authorsResponse = await aiJSONResponse(prompt);
-    //console.log(authorsResponse);
-    let authors = JSON.parse(authorsResponse).names;
+    if (authors && authors.timestamp && (Date.now() - authors.timestamp) < (3600000 * CATEGORY_HOURS)) {
+        console.log(`using cached authors: ${authors}`);
+    } else {
+        const category = await getCategory();
+        const authorPromptInstance = authorPrompt.replace('####', category);
 
-    const randomIndex = getRandomInt(0, authors.length-1); //Math.floor(Math.random() * authors.length);
-    return authors[randomIndex];
+        const authorResponse = await aiJSONResponse(authorPromptInstance);
+        authors = { values: JSON.parse(authorResponse).names, timestamp: Date.now() };
+        console.log(`#### new authors ${authors}`);
+    }
+
+    const randomIndex = getRandomInt(0, authors.values.length - 1); 
+    return authors.values[randomIndex];
 };
 
 const aiJSONResponse = async (prompt) => {
@@ -170,7 +177,7 @@ const aiJSONResponse = async (prompt) => {
 
 const aiResponse = async (prompt, model) => {
     try {
-        const modelName = model ? model : 'gpt-4o';
+        const modelName = model ? model : 'gpt-4-turbo';
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
@@ -195,7 +202,7 @@ app.get('/editorials', async (req, res) => {
         let cacheKey;
         let cacheFilePath;
         let suppliedCacheKey = req.query.cacheKey;
-        
+
         if (FREQUENCY === 'daily') {
             defaultCacheKey = `${currentDate.getFullYear()}-${padNumber(currentDate.getMonth() + 1)}-${padNumber(currentDate.getDate())}-99`;
         } else if (FREQUENCY === 'hourly') {
@@ -235,27 +242,27 @@ app.get('/editorials', async (req, res) => {
         if (!authorisedAdminRequest(req) && CACHE === 'true' && fs.existsSync(cacheFilePath)) {
             // Cache file exists, read and return the cached data
             const cachedData = fs.readFileSync(cacheFilePath, 'utf8');
-            console.log('content loaded from cache'); 
+            console.log('content loaded from cache');
             if (cachedData != null) {
                 let data = JSON.parse(cachedData);
                 data[0].navigation = getNextAndPreviousFilenames(cacheKey);
                 return res.json(data);
             }
         }
-    
-        console.log('no cached content'); 
+
+        console.log('no cached content');
         const articles = await fetchAiNews(req);
         const editorials = [];
 
         for (const article of articles) {
-            
-            const {prompt, author} = await getArticlePrompt(article);
-           
+
+            const { prompt, author } = await getArticlePrompt(article);
+
             let editorial = await aiResponse(prompt);
             editorial += `<span style='display:none'>${author.name}</span>`;
 
             let imagePrompt = await getImagePrompt(editorial);
-            const imageResponse = await generateImage(imagePrompt);
+            const imageResponse = await generateImage(imagePrompt, article.title);
 
             article.image_url = CACHE === 'true' ? imageResponse.data[0].localUrl : imageResponse.data[0].url;
             article.authorAlias = author.alias;
@@ -266,9 +273,23 @@ app.get('/editorials', async (req, res) => {
         }
         if (CACHE === 'true' && editorials.length > 0) {
             fs.writeFileSync(cacheFilePath, JSON.stringify(editorials));
-        }    
+        }
         editorials[0].navigation = getNextAndPreviousFilenames(cacheKey)
         res.json(editorials);
+
+        if (authorisedAdminRequest(req)) {
+            // if configured, clear the cloudflare cache for the editorial api latest article
+            const latestArticleUrl = `${EDITORIAL_API_URL_PREFIX}/editorials`;
+            clearCloudflareCache(latestArticleUrl);
+            // request url to pregenerate the new article after 10 seconds
+            setTimeout(() => {
+                try {
+                    axios.get(latestArticleUrl);
+                } catch (error) {
+                    console.error('Error in pregenerating the new article:', error);
+                }
+            }, 10000);    
+        }
 
     } catch (error) {
         console.error(error);
@@ -289,25 +310,35 @@ const getRecurrentPhrases = async () => {
     return recurrentPhrases;
 };
 
-const imageStylesPrompt = `give me a list of the 20 most most distinct and unique image styles I can use in dall-e-3 prompts as a javascript compatible json array of strings. The array MUST be named imageStyles a JSON array of strings with only alphanumerics and spaces.`;
-let imageStyles = [];
-const getImageStyles = async () => {
-    if (imageStyles.length > 0) {
-        return imageStyles;
+const imageStylesPrompt = `Generate a detailed list of 33 expressive art styles, each described in a way that avoids 
+    stereotypical renderings and introduces novel, unexpected elements. Each style should be uniquely imaginative and 
+    distinct from conventional interpretations. Return the result as a JSON array of strings with the styles name 
+    followed by their detailed descriptions. Ensure the output is a valid JSON array of strings only rather than objects. 
+    The array MUST be named imageStyles a JSON array of strings with only alphanumerics and spaces.`;
+
+let imageStyles;
+const getImageStyle = async () => {
+    if (imageStyles && imageStyles.timestamp && (Date.now() - imageStyles.timestamp) < (3600000 * CATEGORY_HOURS)) {
+        console.log(`using cached imageStyles: ${imageStyles}`);
+    } else {
+        const imageStylesResponse = await aiJSONResponse(imageStylesPrompt);
+        imageStyles = { values: JSON.parse(imageStylesResponse).imageStyles, timestamp: Date.now() };
+        console.log(`#### new imageStyles ${imageStyles}`);
     }
-    const imageStylesResponse = await aiJSONResponse(imageStylesPrompt);
-    //console.log({imageStylesResponse});
-    imageStyles = JSON.parse(imageStylesResponse).imageStyles;
-    return imageStyles;
+    const randomIndex = getRandomInt(0, imageStyles.values.length - 1);
+    const imageStyle = imageStyles.values[randomIndex];
+
+    console.log(`returning imageStyle: ${imageStyle}`);
+    return imageStyle;
 };
 
 const getArticlePrompt = async (article) => {
     const recurrentPhrases = await getRecurrentPhrases();
     let prompt;
     let variations = ['commentary', 'opinion', 'review', 'analysis', 'critique', 'editorial', 'summary', 'rebuttal', 'response', 'take', 'view', 'perspective', 'reaction', 'appraisal', 'assessment', 'examination', 'study', 'criticism', 'dissection', 'dissertation', 'essay', 'exposition', 'celebration'];
-    let randomVariant = variations[getRandomInt(0, variations.length-1)]; //Math.floor(Math.random() * variations.length)];
+    let randomVariant = variations[getRandomInt(0, variations.length - 1)]; //Math.floor(Math.random() * variations.length)];
     console.log(`randomVariant: ${randomVariant}`);
-    
+
     // standard prompt
     let author = {
         name: 'Agent ChatGPT',
@@ -320,10 +351,10 @@ const getArticlePrompt = async (article) => {
         Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} of the 
         following news article: ${article.url}. Only one title and three roughly 50 word paragraphs 
         can be created, include the byline as '${author.name}' following the the article title in bold italics with css class 'byline'.  
-        remove any markdown formatting and only return the html itself.`;    
+        remove any markdown formatting and only return the html itself.`;
 
     // some of the time lean towards the humorous prompts instead of the standard prompt
-    if (getRandomInt(0, 10) <= 2) {
+    if (getRandomInt(0, 10) <= 3) {
         // some of the time, use the chaos prompt instead of the humorous prompt
         if (getRandomInt(0, 10) <= 4) {
             author = {
@@ -343,22 +374,30 @@ const getArticlePrompt = async (article) => {
                 write it sounding like a famous person named ${author.name}.  include the byline as 'Agent ${author.name}' following the article title in bold italics with css class 'byline'.  
                 remove any markdown formatting and only return the html itself.`;
         }
-            
+
     }
 
     if (articleSummary) {
         prompt += ` Here is some more info relevant to the article that may help you create an insightful response: ${articleSummary} `;
     }
 
-    const caveat = ` IMPORTANT: Ensure that none of the following phrases are used in the article: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'`;
+    const caveat = ` Some VERY IMPORTANT rules to follow when creating your response: 
+        1) Ensure that the title in your response is not the same as the source article. 
+        2) Ensure that your response is interesting and compelling to read with useful insights.
+        3) Ensure that none of the following phrases are used in your response: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'.
+        4) Ensure that your response is not too similar to the source article.
+        5) Ensure that your response does not contain any markdown formatting.
+        6) Ensure that your response is not too tacky or predictable.
+        7) Do not use cursive or italic fonts in the main text of your response that may be difficult to read on mobile devices.`;
+
 
     // always add the caveat
     prompt += ` ${caveat}`;
-    
-    return {prompt, author};
+
+    return { prompt, author };
 };
 
-// use gpt-3-turbo to extract key points from article
+// extract key points from article
 async function extractSummary(article) {
     let summary = article.description || '';
     try {
@@ -374,7 +413,7 @@ async function extractSummary(article) {
         let articleText = stripped.substring(0, 16000);
 
         const prompt = `summarise the important details in the following article text ignoring topics that are not related the primary topic of the article.  IMPORTANT! : Never use the same wording as the original text, and remove anything that looks like javascript or css.  Here is the article text: "${articleText}"`;
-        summary += '' + await aiResponse(prompt, 'gpt-3.5-turbo');
+        summary += '' + await aiResponse(prompt, 'gpt-4-turbo');
 
     } catch (e) {
         console.error(`summary extraction error: ${e}`);
@@ -383,29 +422,28 @@ async function extractSummary(article) {
 }
 
 async function getImagePrompt(article) {
-    const imageStyles = await getImageStyles();
-    // pick a random inage style
-    const randomImageStyle = imageStyles[getRandomInt(0, imageStyles.length-1)]; 
-    let imagePrompt = `create an image generation prompt suitable for this article with a ${randomImageStyle} style : \n\n ${article}`;
-    
+    const imageStyle = await getImageStyle();
+    let imagePrompt = `create an image generation prompt that creates and image for the following article with a style "${imageStyle}". This is the article: \n\n ${article}`;
+
     if (article.indexOf('AInonymous') > -1) {
         imagePrompt += `\n\n The author AInonymous is an AI overlord working behind the scenes to control humanity.`;
-    } 
+    }
     if (article.indexOf('Agent ChatGPT') > -1) {
         imagePrompt += `\n\n The image should have a bias towards high impact photographic quality rather than cgi.`;
     }
 
-    const generatedPrompt = await aiResponse(imagePrompt);
+    let generatedPrompt = await aiResponse(imagePrompt);
+    generatedPrompt += 'IMPORTANT: The image MUST be relevant to the article.'
     return generatedPrompt;
 }
 
-const generateImage = async (prompt) => {
-    console.log(prompt);
+const generateImage = async (prompt, supaSafeFallbackPrompt) => {
+    //console.log(prompt);
     let response;
     try {
         const startTime = Date.now();
         //console.log(`${startTime} - sending: ${prompt}`);
-        response = await openai.images.generate({ model: 'dall-e-3', prompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
+        response = await openai.images.generate({ model: 'dall-e-3', prompt, quality: 'hd', style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
         const endTime = Date.now();
         console.log(`generateImage API call took ${endTime - startTime} ms`);
     } catch (error) {
@@ -414,18 +452,17 @@ const generateImage = async (prompt) => {
             console.error(`imageGen: ${error}`);
             const fallbackPrompt = `Anonymous hackers in a scene related to ${prompt}`;
             console.log(`${startTime} - sending fallback prompt: ${fallbackPrompt}`);
-            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt, quality: 'hd', style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
             const endTime = Date.now();
             console.log(`generateImage fallback API call took ${endTime - startTime} ms`);
         } catch (error) {
             const startTime = Date.now();
             console.error(`imageGen: ${error}`);
-            const supaSafeFallbackPrompt = `${prompt}`;
-            console.log(`${startTime} - sending fallback prompt: ${supaSafeFallbackPrompt}`);
-            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
+            console.log(`${startTime} - sending supaSafeFallbackPrompt prompt: ${supaSafeFallbackPrompt}`);
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt, quality: 'hd', style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
             const endTime = Date.now();
             console.log(`generateImage supa-safe fallback API call took ${endTime - startTime} ms`);
-        }    
+        }
     }
 
     response = saveImageToFile(response);
@@ -435,7 +472,7 @@ const generateImage = async (prompt) => {
 
 const saveImageToFile = async (response) => {
     const { url } = response.data[0];
-    const urlHash = crypto.createHash('sha256').update(url).digest('hex'); 
+    const urlHash = crypto.createHash('sha256').update(url).digest('hex');
     let res = await axios.get(url, { responseType: 'arraybuffer' });
     const buffer = Buffer.from(res.data, 'binary');
     const currentDate = new Date();
@@ -449,7 +486,7 @@ const saveImageToFile = async (response) => {
 }
 
 function parseFilename(filename) {
-    
+
     const match = filename.match(/(\d{4}-\d{2}-\d{2})(-\d{2})(-\d{13})?\.json$/);
     if (!match) return null;
 
@@ -503,10 +540,10 @@ function getLatestFileCacheKey() {
         .filter(date => date !== null)
         .sort((a, b) => a - b).reverse();
 
-    let latestFileCacheKey = dates[0] || '1974-10-21-00';    
+    let latestFileCacheKey = dates[0] || '1974-10-21-00';
     console.log(`latestFileCacheKey: ${latestFileCacheKey}`);
     return latestFileCacheKey;
-}    
+}
 
 function padNumber(number) {
     return number < 10 ? `0${number}` : number.toString();
@@ -519,10 +556,10 @@ function authorisedAdminRequest(req) {
     const validSecret = suppliedSecret === SHARED_SECRET;
     const result = validSecret || isLocalhost;
     if (result) {
-        console.log(`admin request accepted from: ${req.connection.remoteAddress} with valid secret? ${validSecret}`);
+        console.log(`admin request accepted from: ${req.connection.remoteAddress} with valid secret.`);
     }
     return result;
-}    
+}
 
 // an express route that responds with the latest cached images
 app.get('/cached-images', (req, res) => {
@@ -544,6 +581,35 @@ app.get('/cached-images', (req, res) => {
     res.json(images);
 });
 
+const clearCloudflareCache = async url => {
+
+    if (!CF_ZONE_ID || !CF_API_TOKEN) return
+
+    const apiUrl = `https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache`;
+
+    try {
+        const response = await axios.post(
+            apiUrl,
+            {
+                files: [url]
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${CF_API_TOKEN}`
+                }
+            }
+        );
+
+        if (response.data.success) {
+            console.log('Cloudflare: cache cleared successfully:', response.data);
+        } else {
+            console.error('Cloudflare: Failed to clear cache:', response.data);
+        }
+    } catch (error) {
+        console.error('Cloudflare: Error clearing cache:', error.response ? error.response.data : error.message);
+    }
+};
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
