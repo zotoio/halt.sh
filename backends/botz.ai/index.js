@@ -46,7 +46,7 @@ const app = express();
 app.use(bodyParser.json());
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const keywords = ['llm', 'sora', 'chatgpt', 'chatgpt%20pro', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'gemini%201.5', 'gemini%20pro', 'google%20gemma', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'gpt-4o', 'hugging%20face', 'meta%20llama'];
+const keywords = ['claude 3.5', 'anthropic', 'runwayml', 'slm', 'llm', 'sora', 'chatgpt', 'chatgpt%20pro', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'gemini%201.5', 'gemini%20pro', 'google%20gemma', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'gpt-4o', 'hugging%20face', 'meta%20llama'];
 
 const isWeekend = () => {
     const currentDate = new Date();
@@ -383,12 +383,13 @@ const getArticlePrompt = async (article) => {
 
     const caveat = ` Some VERY IMPORTANT rules to follow when creating your response: 
         1) Ensure that the title in your response is not the same as the source article. 
-        2) Ensure that your response is interesting and compelling to read with useful insights.
-        3) Ensure that none of the following phrases are used in your response: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'.
-        4) Ensure that your response is not too similar to the source article.
-        5) Ensure that your response does not contain any markdown formatting.
-        6) Ensure that your response is not too tacky or predictable.
-        7) Do not use cursive or italic fonts in the main text of your response that may be difficult to read on mobile devices.`;
+        2) Ensure that there are no html elements of this list: 'html', 'head', 'body', 'script', 'style', 'iframe', 'embed', 'object', 'applet', 'base', 'meta', 'link', 'title', 'svg', 'canvas', 'noscript', 'form', 'input', 'textarea', 'button', 'select', 'option', 'optgroup', 'fieldset', 'legend', 'label', 'datalist', 'output', 'progress', 'meter', 'details', 'summary', 'menu', 'menuitem', 'dialog', 'script', 'style', 'iframe', 'embed', 'object', 'applet', 'base', 'meta', 'link', 'title', 'svg', 'canvas', 'noscript', 'form', 'input', 'textarea', 'button', 'select', 'option', 'optgroup', 'fieldset', 'legend', 'label', 'datalist', 'output', 'progress', 'meter', 'details', 'summary', 'menu', 'menuitem', 'dialog'.
+        3) Ensure that your response is interesting and compelling to read with useful insights.
+        4) Ensure that none of the following phrases are used in your response: 'buckle up', 'futile', '${recurrentPhrases.join(`', '`)}'.
+        5) Ensure that your response is not too similar to the source article.
+        6) Ensure that your response does not contain any markdown formatting.
+        7) Ensure that your response is not too tacky or predictable.
+        8) Do not use cursive or italic fonts in the main text of your response that may be difficult to read on mobile devices.`;
 
 
     // always add the caveat
