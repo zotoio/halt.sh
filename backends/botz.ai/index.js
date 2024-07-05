@@ -15,6 +15,7 @@ dotenv.config();
 
 const {
     OPENAI_API_KEY,
+    OPENAI_CHAT_MODEL = 'gpt-4o',
     NEWS_API_KEY,
     PORT = 3000,
     FREQUENCY = 'daily',
@@ -156,12 +157,13 @@ const getAuthor = async () => {
     return authors.values[randomIndex];
 };
 
-const aiJSONResponse = async (prompt) => {
+const aiJSONResponse = async (prompt, model) => {
     try {
+        const modelName = model ? model : OPENAI_CHAT_MODEL;
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: modelName,
             response_format: { type: 'json_object' },
             messages: [{ role: 'user', content: prompt }]
         });
@@ -177,7 +179,7 @@ const aiJSONResponse = async (prompt) => {
 
 const aiResponse = async (prompt, model) => {
     try {
-        const modelName = model ? model : 'gpt-4-turbo';
+        const modelName = model ? model : OPENAI_CHAT_MODEL;
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
@@ -414,7 +416,7 @@ async function extractSummary(article) {
         let articleText = stripped.substring(0, 16000);
 
         const prompt = `summarise the important details in the following article text ignoring topics that are not related the primary topic of the article.  IMPORTANT! : Never use the same wording as the original text, and remove anything that looks like javascript or css.  Here is the article text: "${articleText}"`;
-        summary += '' + await aiResponse(prompt, 'gpt-4-turbo');
+        summary += '' + await aiResponse(prompt);
 
     } catch (e) {
         console.error(`summary extraction error: ${e}`);
@@ -477,7 +479,7 @@ const saveImageToFile = async (response) => {
     let res = await axios.get(url, { responseType: 'arraybuffer' });
     const buffer = Buffer.from(res.data, 'binary');
     const currentDate = new Date();
-    const cacheKey = `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}-${currentDate.getDate()}-${currentDate.getHours()}-${urlHash}`;
+    const cacheKey = `${currentDate.getFullYear()}-${padNumber(currentDate.getMonth() + 1)}-${padNumber(currentDate.getDate())}-${padNumber(currentDate.getHours())}-${urlHash}`;
     const cacheFilePath = `${path.join(cacheDir, 'images', cacheKey)}.png`;
     console.log(cacheFilePath);
     fs.writeFileSync(cacheFilePath, buffer);
