@@ -15,7 +15,9 @@ dotenv.config();
 
 const {
     OPENAI_API_KEY,
-    OPENAI_CHAT_MODEL = 'gpt-4o',
+    OPENAI_MODEL_STRONG = 'gpt-4o',
+    OPENAI_MODEL_WEAK = 'gpt-3.5-turbo-0125',
+    OPENAI_IMAGE_QUALITY = 'hd', // or 'standard'
     NEWS_API_KEY,
     PORT = 3000,
     FREQUENCY = 'daily',
@@ -47,7 +49,7 @@ const app = express();
 app.use(bodyParser.json());
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const keywords = ['claude 3.5', 'anthropic', 'runwayml', 'slm', 'llm', 'sora', 'chatgpt', 'chatgpt%20pro', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'gemini%201.5', 'gemini%20pro', 'google%20gemma', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'gpt-4o', 'hugging%20face', 'meta%20llama'];
+const keywords = ['claude 3.5', 'anthropic', 'runwayml', 'slm', 'llm', 'large%2language%20model', 'ollama', 'sora', 'chatgpt', 'chatgpt%20pro', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'gemini%201.5', 'gemini%20pro', 'google%20gemma', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'gpt-4o', 'hugging%20face', 'meta%20llama'];
 
 const isWeekend = () => {
     const currentDate = new Date();
@@ -102,7 +104,7 @@ const fetchAiNews = async (req) => {
         result.push(...response.data.data);
         //console.log(result);
     }
-    if (SINGLE_RANDOM === 'true') result = result[getRandomInt(0, result.length - 1)]; 
+    if (SINGLE_RANDOM === 'true') result = result[getRandomInt(0, result.length - 1)];
     console.log(result);
     return [result];
 };
@@ -153,13 +155,13 @@ const getAuthor = async () => {
         console.log(`#### new authors ${authors}`);
     }
 
-    const randomIndex = getRandomInt(0, authors.values.length - 1); 
+    const randomIndex = getRandomInt(0, authors.values.length - 1);
     return authors.values[randomIndex];
 };
 
 const aiJSONResponse = async (prompt, model) => {
     try {
-        const modelName = model ? model : OPENAI_CHAT_MODEL;
+        const modelName = model ? model : OPENAI_MODEL_WEAK;
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
@@ -179,7 +181,7 @@ const aiJSONResponse = async (prompt, model) => {
 
 const aiResponse = async (prompt, model) => {
     try {
-        const modelName = model ? model : OPENAI_CHAT_MODEL;
+        const modelName = model ? model : OPENAI_MODEL_STRONG;
         const startTime = Date.now();
         console.log(`${startTime} - sending: ${prompt}`);
         const chatCompletion = await openai.chat.completions.create({
@@ -290,7 +292,7 @@ app.get('/editorials', async (req, res) => {
                 } catch (error) {
                     console.error('Error in pregenerating the new article:', error);
                 }
-            }, 10000);    
+            }, 10000);
         }
 
     } catch (error) {
@@ -416,7 +418,7 @@ async function extractSummary(article) {
         let articleText = stripped.substring(0, 16000);
 
         const prompt = `summarise the important details in the following article text ignoring topics that are not related the primary topic of the article.  IMPORTANT! : Never use the same wording as the original text, and remove anything that looks like javascript or css.  Here is the article text: "${articleText}"`;
-        summary += '' + await aiResponse(prompt);
+        summary += '' + await aiResponse(prompt, OPENAI_MODEL_WEAK);
 
     } catch (e) {
         console.error(`summary extraction error: ${e}`);
@@ -435,7 +437,7 @@ async function getImagePrompt(article) {
         imagePrompt += `\n\n The image should have a bias towards high impact photographic quality rather than cgi.`;
     }
 
-    let generatedPrompt = await aiResponse(imagePrompt);
+    let generatedPrompt = await aiResponse(imagePrompt, OPENAI_MODEL_WEAK);
     generatedPrompt += 'IMPORTANT: The image MUST be relevant to the article.'
     return generatedPrompt;
 }
@@ -446,7 +448,7 @@ const generateImage = async (prompt, supaSafeFallbackPrompt) => {
     try {
         const startTime = Date.now();
         //console.log(`${startTime} - sending: ${prompt}`);
-        response = await openai.images.generate({ model: 'dall-e-3', prompt, quality: 'hd', style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
+        response = await openai.images.generate({ model: 'dall-e-3', prompt, quality: OPENAI_IMAGE_QUALITY, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
         const endTime = Date.now();
         console.log(`generateImage API call took ${endTime - startTime} ms`);
     } catch (error) {
@@ -455,14 +457,14 @@ const generateImage = async (prompt, supaSafeFallbackPrompt) => {
             console.error(`imageGen: ${error}`);
             const fallbackPrompt = `Anonymous hackers in a scene related to ${prompt}`;
             console.log(`${startTime} - sending fallback prompt: ${fallbackPrompt}`);
-            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt, quality: 'hd', style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: fallbackPrompt, quality: OPENAI_IMAGE_QUALITY, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
             const endTime = Date.now();
             console.log(`generateImage fallback API call took ${endTime - startTime} ms`);
         } catch (error) {
             const startTime = Date.now();
             console.error(`imageGen: ${error}`);
             console.log(`${startTime} - sending supaSafeFallbackPrompt prompt: ${supaSafeFallbackPrompt}`);
-            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt, quality: 'hd', style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
+            response = await openai.images.generate({ model: 'dall-e-3', prompt: supaSafeFallbackPrompt, quality: OPENAI_IMAGE_QUALITY, style: getRandomInt(0, 1) === 0 ? 'natural' : 'vivid' });
             const endTime = Date.now();
             console.log(`generateImage supa-safe fallback API call took ${endTime - startTime} ms`);
         }
@@ -564,24 +566,95 @@ function authorisedAdminRequest(req) {
     return result;
 }
 
-// an express route that responds with the latest cached images
-app.get('/cached-images', (req, res) => {
+// an express route that responds with cached editorials
+app.get('/archive', async (req, res) => {
 
     // read the files
-    let files = fs.readdirSync(`${cacheDir}/images`);
-
-    // sort the files in created date descending
-    files.sort((a, b) => {
-        const fileA = fs.statSync(`${cacheDir}/images/${a}`);
-        const fileB = fs.statSync(`${cacheDir}/images/${b}`);
-        return fileB.ctimeMs - fileA.ctimeMs;
+    let files = await fs.promises.readdir(`${cacheDir}`, { withFileTypes: true }, (err, files) => {
+        if (err) {
+            console.error(err);
+            return;
+        }
     });
 
-    files = files.slice(0, 23);
+    let jsonFiles = files
+        .filter(file => file.isFile() && path.extname(file.name) === '.json')
+        .map(file => file.name)
+        .sort((a, b) => b.localeCompare(a));
 
-    const images = files.map(file => `/cache/images/${file}`);
+    console.log(`found ${jsonFiles.length} editorials in archive..`);
 
-    res.json(images);
+    // Get page number and size
+    const pageParam = parseInt(req.query.page);
+    const sizeParam = parseInt(req.query.size);
+    console.log(`pageParam: ${pageParam}, sizeParam: ${sizeParam}`);
+
+    const size = sizeParam && sizeParam < 6 ? sizeParam : 6;
+    const page = pageParam && (pageParam * size) < jsonFiles.length ? pageParam : -1;
+    
+    const start = (page - 1) * size;
+    const end = start + size;
+
+    // Ensure start and end are within the bounds of the array
+    const validStart = (start >= 0 && start < jsonFiles.length) ? start : -1;
+    const validEnd = (end > 0 && end <= jsonFiles.length) ? end : -1;
+
+    console.log(`page: ${page}, size: ${size}, start: ${validStart}, end: ${validEnd}`);
+
+    if (validStart === -1 || validEnd === -1) {
+        const response = {
+            editorials: [],
+            pagination: {
+                has_next: false
+            }
+        };
+        return res.json(response);
+    }
+
+    console.log(`page: ${page}, size: ${size}, start: ${validStart}, end: ${validEnd}`);
+
+    const pagejsonFiles = jsonFiles.slice(validStart, validEnd);
+    console.log(pagejsonFiles);
+
+    const editorialPromises = pagejsonFiles.map(file => {
+        const filePath = path.join(cacheDir, file);
+        console.log(`Reading file: ${filePath}`); // Log the file path
+
+        return new Promise((resolve, reject) => {
+            fs.readFile(filePath, 'utf8', (err, data) => {
+                if (err) {
+                    reject(err);
+                } else {
+
+                    data = JSON.parse(data)[0];
+                    const $ = cheerio.load(data.editorial);
+                    const cacheKey = file.split('/').pop().replace('.json', '');
+                    const result = {
+                        cache_key: cacheKey,
+                        title: $('.ai-title').text(),
+                        image_url: data.article.image_url,
+                        generated_at: data.article.generated_at,
+                    };
+                    resolve(result); // Parse JSON data
+                }
+            });
+        });
+    });
+
+    try {
+        const editorials = await Promise.all(editorialPromises) || [];
+        console.log(`editorials: ${jsonFiles.length}`);
+        console.log(`pagination: ${validEnd}`);
+        const response = {
+            editorials,
+            pagination: {
+                has_next: validEnd < jsonFiles.length,
+            }
+        };
+        res.json(response);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to read JSON files' });
+    }
 });
 
 const clearCloudflareCache = async url => {
