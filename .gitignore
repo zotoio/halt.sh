@@ -77,3 +77,4 @@ scripts/*.json
 
 .env
 cache/
+.aider*
