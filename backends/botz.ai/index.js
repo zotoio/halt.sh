@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import axios from 'axios';
+import rateLimit from 'express-rate-limit';
 import bodyParser from 'body-parser';
 import OpenAI from 'openai';
 import fs from 'fs';
@@ -8,6 +9,7 @@ import path from 'path';
 import crypto from 'crypto';
 import curlirize from 'axios-curlirize';
 import cheerio from 'cheerio';
+import sanitizeHtml from 'sanitize-html';
 
 curlirize(axios);
 
@@ -47,6 +49,14 @@ if (!fs.existsSync(`${cacheDir}/images`)) {
 
 const app = express();
 app.use(bodyParser.json());
+app.use(helmet());
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+
+app.use(limiter);
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 const keywords = ['claude 3.5', 'anthropic', 'runwayml', 'slm', 'llm', 'large%2language%20model', 'ollama', 'sora', 'chatgpt', 'chatgpt%20pro', 'midjourney', 'dall-e', 'openai', 'genai', 'generative%20ai', 'copilot', 'google%20gemini', 'gemini%201.5', 'gemini%20pro', 'google%20gemma', 'bard', 'gpt-3', 'gpt-4', 'gpt', 'gpt-4o', 'hugging%20face', 'meta%20llama'];
@@ -220,14 +230,14 @@ app.get('/editorials', async (req, res) => {
             cacheKey = getLatestFileCacheKey();
         }
 
-        cacheFilePath = `${path.join(cacheDir, cacheKey)}.json`;
+        cacheFilePath = path.join(cacheDir, sanitize(cacheKey) + '.json');
 
         if (suppliedCacheKey) {
             // suppliedCacheKey must be: 
             // 1. only digits and dash
             // 2. length of either 13 (hour resolution) or 27 (timestamp resolution)
             // example valid values: 2021-09-01-09, 2021-09-01-99-1630480000000 
-            const isValidCacheKey = suppliedCacheKey && /(\d{4}-\d{2}-\d{2})(-\d{2})(-\d{13})?$/.test(suppliedCacheKey);
+            const isValidCacheKey = suppliedCacheKey && /^(\d{4}-\d{2}-\d{2})(-\d{2})(-\d{13})?$/.test(suppliedCacheKey);
 
             if (isValidCacheKey) {
                 let suppliedCacheFilePath = `${path.join(cacheDir, suppliedCacheKey)}.json`;
@@ -263,7 +273,8 @@ app.get('/editorials', async (req, res) => {
             const { prompt, author } = await getArticlePrompt(article);
 
             let editorial = await aiResponse(prompt);
-            editorial += `<span style='display:none'>${author.name}</span>`;
+            editorial = sanitizeHtml(editorial);
+            editorial += sanitizeHtml(`<span style='display:none'>${author.name}</span>`);
 
             let imagePrompt = await getImagePrompt(editorial);
             const imageResponse = await generateImage(imagePrompt, article.title);
@@ -296,8 +307,8 @@ app.get('/editorials', async (req, res) => {
         }
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'An error occurred while generating editorials.' });
+        console.error('Error generating editorials:', error);
+        res.status(500).json({ message: 'An internal server error occurred.' });
     }
 });
 
