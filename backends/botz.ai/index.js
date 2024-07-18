@@ -644,7 +644,7 @@ app.get('/archive', async (req, res) => {
                     const cacheKey = file.split('/').pop().replace('.json', '');
                     const result = {
                         cache_key: cacheKey,
-                        title: $('.ai-title').text(),
+                        title: $('h2').text(),
                         image_url: data.article.image_url,
                         generated_at: data.article.generated_at,
                     };
