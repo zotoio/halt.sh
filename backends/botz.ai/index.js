@@ -365,7 +365,7 @@ const getArticlePrompt = async (article) => {
     let articleSummary = await extractSummary(article);
 
     prompt = `You are an expert professional technologist with deep understanding of coding and the latest developments in GenAI and LLMs. 
-        Using the html h2 tag class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} of the 
+        Using the html h2 tag of class 'ai-title' and text-align left for the title and an html p tag for the rest, write a roughly 150 word ${randomVariant} of the 
         following news article: ${article.url}. Only one title and three roughly 50 word paragraphs 
         can be created, include the byline as '${author.name}' following the the article title in bold italics with css class 'byline'.  
         remove any markdown formatting and only return the html itself.`;
@@ -602,7 +602,7 @@ app.get('/archive', async (req, res) => {
     const sizeParam = parseInt(req.query.size);
     console.log(`pageParam: ${pageParam}, sizeParam: ${sizeParam}`);
 
-    const size = sizeParam && sizeParam < 6 ? sizeParam : 6;
+    const size = sizeParam && sizeParam < 24 ? sizeParam : 24;
     const page = pageParam && (pageParam * size) < jsonFiles.length ? pageParam : -1;
     
     const start = (page - 1) * size;
