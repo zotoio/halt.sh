@@ -6,6 +6,8 @@ import bodyParser from 'body-parser';
 import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
+import sanitize from 'sanitize-filename';
+import helmet from 'helmet';
 import crypto from 'crypto';
 import curlirize from 'axios-curlirize';
 import cheerio from 'cheerio';
@@ -49,6 +51,7 @@ if (!fs.existsSync(`${cacheDir}/images`)) {
 
 const app = express();
 app.use(bodyParser.json());
+app.use(helmet());
 app.use(helmet());
 
 const limiter = rateLimit({
