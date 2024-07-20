@@ -21,7 +21,7 @@ const {
     OPENAI_API_KEY,
     OPENAI_MODEL_STRONG = 'gpt-4o',
     OPENAI_MODEL_WEAK = 'gpt-3.5-turbo-0125',
-    OPENAI_IMAGE_QUALITY = 'hd', // or 'standard'
+    OPENAI_IMAGE_QUALITY = 'standard', // or 'hd'
     NEWS_API_KEY,
     PORT = 3000,
     FREQUENCY = 'daily',
