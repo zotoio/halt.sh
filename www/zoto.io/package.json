@@ -1,9 +1,10 @@
 {
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.7",
+    "serve": "^14.2.0"
   },
   "scripts": {
-    "start": "node server.js",
-    "start:dev": "nodemon --watch src --exec \"yarn start\""
+    "start": "serve -s .",
+    "start:dev": "nodemon --watch . --ext html,css,js --exec \"yarn start\""
   }
 }
