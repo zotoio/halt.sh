@@ -1,5 +1,10 @@
 {
+  "devDependencies": {
+    "serve": "^14.2.0",
+    "nodemon": "^3.1.7"
+  },
   "scripts": {
-    "start:dev": "nodemon --watch * --exec \"yarn run start\""
+    "start": "serve -s .",
+    "start:dev": "nodemon --watch . --ext html,css,js --exec \"yarn start\""
   }
 }
