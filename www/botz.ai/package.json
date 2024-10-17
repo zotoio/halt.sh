@@ -1,10 +1,10 @@
 {
   "devDependencies": {
     "serve": "^14.2.0",
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.7",
+    "kill-port": "2.0.1"
   },
   "scripts": {
-    "start": "serve -s .",
-    "start:dev": "nodemon --watch . --ext html,css,js --exec \"serve -s .\""
+    "start:dev": "nodemon --watch . --ext html,css,js --exec \"serve -s . -p 8080\""
   }
 }
