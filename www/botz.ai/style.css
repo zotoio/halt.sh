@@ -5,7 +5,7 @@ body {
   margin: 0;
   padding: 0;
   background: #000;
-  color: #1f0a0a;
+  color: #fff;
   background-image: url('/wallpaper-image-dark.jpg');
 }
 
@@ -13,8 +13,13 @@ body {
 h1 {
   background: #333;
   color: #fff;
-  text-align: center;
-  margin-bottom: 15px;
+  text-align: left;
+  padding-left: 32px;
+  opacity: 70%;
+}
+
+h2 {
+  filter: brightness(1.5);
 }
 
 /* Introduction Paragraph Styles */
@@ -39,11 +44,16 @@ h1 {
 
 #article-list li {
   min-height: 500px;
-  background: #fff;
+  background: #000;
   margin-bottom: 15px;
   padding: 15px;
   border-radius: 5px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  opacity: 70%;
+}
+
+#article-list li p {
+  filter: brightness(1.5);
 }
 
 /* Image Styles */

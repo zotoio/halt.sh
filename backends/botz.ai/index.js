@@ -55,7 +55,7 @@ app.use(helmet());
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 5000 // limit each IP to 5000 requests per windowMs
 });
 
 app.use(limiter);
@@ -542,8 +542,8 @@ function getNextAndPreviousFilenames(currentFilename) {
     dates.splice(currentIndex, 1);
 
     // skip forward up to 5 files to get a random file
-    const randomIndex = currentIndex + getRandomInt(1, 5);
-    const randomFile = dates[randomIndex < dates.length ? randomIndex : 0];
+    const randomIndex = currentIndex + getRandomInt(1, 50);
+    const randomFile = dates[randomIndex < dates.length ? randomIndex : getRandomInt(1, dates.length-1)];
 
     let result = { next: nextFile, previous: prevFile, random: randomFile };
     console.log(result);
@@ -572,7 +572,7 @@ function authorisedAdminRequest(req) {
     console.log(`local: ${req.connection.localAddress} remote: ${req.connection.remoteAddress}`);
     const isLocalhost = req.connection.localAddress === req.connection.remoteAddress;
     const validSecret = suppliedSecret === SHARED_SECRET;
-    const result = validSecret || isLocalhost;
+    const result = validSecret || (validSecret && isLocalhost);
     if (result) {
         console.log(`admin request accepted from: ${req.connection.remoteAddress} with valid secret.`);
     }

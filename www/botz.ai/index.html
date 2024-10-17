@@ -12,16 +12,20 @@
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>botz.ai - AI News</title>
+  <title>botz.ai - GenAI News</title>
   <link rel="stylesheet" href="style.css">
   <meta name="description"
     content="Botz.ai offers the latest news and insights in the world of artificial intelligence. Stay updated with AI trends, breakthroughs, and analysis. Discover how AI is transforming technology and industries worldwide.">
   <meta name="keywords"
-    content="AI news, artificial intelligence, AI trends, AI breakthroughs, AI analysis, machine learning, deep learning, AI technology, AI in business, AI updates, AI research">
+    content="GenAI News, AI news, llms, large language models, gemini, ollama, openai, anthropic, claude, artificial intelligence, AI trends, AI breakthroughs, AI analysis, machine learning, deep learning, AI technology, AI in business, AI updates, AI research">
 </head>
 
 <body>
-  <h1><a href="/">AI News</a></h1>
+  <h1><a href="/"><img src="favicon.ico" width="40px" height="40px" style="
+    top: -10px;
+    padding-bottom: 6px;
+    vertical-align: middle;
+"> GenAI News</a></h1>
   <div style="float: right; height: 30px; width: 30px; text-align: right;
     top: 33px; right: 20px; position: absolute;">
     <a href="" id="random-link" class="random-link">
@@ -32,13 +36,14 @@
 
   <ul id="article-list"></ul>
   <p class="error-message"></p>
-  
+
   <div id="editorials-container"></div>
   <div id="loading" style="display: none;">Loading...</div>
-  
+
   <div id="scroll-to-top" class="scroll-to-top">
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M18 15l-6-6-6 6"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 15l-6-6-6 6" />
     </svg>
   </div>
 
@@ -91,14 +96,14 @@
         if (window.location.hash) {
           let hashKey = window.location.hash.slice(1);
           // console.log(hashKey);
-          document.title = `botz.ai - AI News - ${hashKey}`;
+          document.title = `botz.ai - GenAI News - ${hashKey}`;
           fetchArticles(hashKey);
         } else {
           fetchArticles();
         }
       } catch (e) {
         let cacheKey;
-        document.title = `botz.ai - AI News`;
+        document.title = `botz.ai - GenAI News`;
         fetchArticles();
         //console.log(e);
       }
@@ -152,7 +157,6 @@
               </div></<article>`;
             articleList.appendChild(li);
           });
-          articleList.appendChild(document.createElement('hr'));
 
           const navigation = document.createElement('nav');
 
@@ -262,12 +266,12 @@
           document.getElementById('loading').style.display = 'none';
         });
     }
-    
+
     function isBottomOfPage() {
-      return (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500;
+      return (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 700;
     }
 
-    window.addEventListener('scroll', function() {
+    window.addEventListener('scroll', function () {
       console.log(`${isBottomOfPage()} ${isLoading} ${hasMore}`);
       if (isBottomOfPage() && !isLoading && hasMore) {
         currentPage++;
