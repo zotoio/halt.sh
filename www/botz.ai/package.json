@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "start:dev": "nodemon --watch src --exec \"yarn run start\""
+  }
+}

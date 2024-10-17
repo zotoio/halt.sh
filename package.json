@@ -4,3 +4,8 @@
     "nodemon": "^3.1.7"
   }
 }
+{
+  "scripts": {
+    "start:dev": "concurrently \"yarn --cwd backends/botz.ai start:dev\" \"yarn --cwd www/botz.ai start:dev\""
+  }
+}
