@@ -579,6 +579,19 @@ function authorisedAdminRequest(req) {
     return result;
 }
 
+app.get('/cache/images/:image', (req, res) => {
+    const { image } = req.params;
+    // santize the image param
+    const imageName = image.replace(/[^a-zA-Z0-9-_.]/g, '');
+    const imagePath = path.join(cacheDir, 'images', imageName);
+    if (fs.existsSync(imagePath)) {
+        res.sendFile(imagePath);
+    } else {
+        res.status(404).send('Image not found');
+    }
+});
+
+
 // an express route that responds with cached editorials
 app.get('/archive', async (req, res) => {
 

@@ -17,12 +17,10 @@
   },
   "type": "module",
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.7",
+    "kill-port": "2.0.1"
   },
   "scripts": {
-    "start:dev": "nodemon index.js"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.7"
+    "start:dev": "kill-port 3000 && nodemon index.js"
   }
 }

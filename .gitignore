@@ -78,3 +78,6 @@ scripts/*.json
 .env
 cache/
 .aider*
+
+.vscode/
+ast.json
