@@ -5,6 +5,6 @@
   },
   "scripts": {
     "start": "serve -s .",
-    "start:dev": "nodemon --watch . --ext html,css,js --exec \"yarn start\""
+    "start:dev": "nodemon --watch . --ext html,css,js --exec \"serve -s .\""
   }
 }
