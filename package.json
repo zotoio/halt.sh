@@ -8,8 +8,3 @@
     "start:zoto:dev": "concurrently \"yarn --cwd backends/zoto.io start:dev\" \"yarn --cwd www/zoto.io start:dev\""
   }
 }
-{
-  "scripts": {
-    "start:dev": "concurrently \"yarn --cwd backends/botz.ai start:dev\" \"yarn --cwd www/botz.ai start:dev\""
-  }
-}
